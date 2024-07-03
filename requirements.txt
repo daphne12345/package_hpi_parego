@@ -1,0 +1,6 @@
+deepcave~=1.2.1
+numpy~=1.26.4
+scipy~=1.14.0
+smac~=2.1.0
+pandas~=2.2.2
+configspace~=0.6.1
