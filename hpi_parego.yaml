@@ -1,0 +1,15 @@
+# @package _global_
+optimizer_id: HPI-ParEGO
+optimizer_container_id: SMAC3
+optimizer:
+  smac_cfg:
+    smac_kwargs:
+      acquisition_maximizer:
+        _target_: pckg_hpi_parego.MyLocalAndSortedRandomSearch
+        _partial_: true
+      acquisition_function:
+        _target_: pckg_hpi_parego.MyEI
+        _partial_: true
+      config_selector:
+        _target_: pckg_hpi_parego.MyConfigSelector
+        _partial_: true
