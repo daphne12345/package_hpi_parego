@@ -6,15 +6,12 @@ from my_ei_hpi import MyEI
 from my_local_and_random_search import MyLocalAndSortedRandomSearch
 
 if __name__ == "__main__":
+    smac_tuner = None
 
     # Define the smac scenario with the respective configspace, 10000 trials, and 50 epochs
-    run_name = 'run_' + datetime.now().strftime('%M_%D_%h_%m.%f')[:-3]
-    run_name = run_name + '_hpi' if args.hpi else run_name + '_no_hpi'
     scenario = Scenario(
         smac_tuner.configspace,
-        output_directory='smac3_output/' + args.experiment_name + '/' + run_name,
-        name=run_name,
-        objectives=objectives,
+        objectives=['1-accuracy','energy'],
         walltime_limit=1000000,
         n_trials=20,
         n_workers=1,
