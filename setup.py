@@ -7,7 +7,7 @@ from my_local_search import MyLocalSearch
 from fanova import fANOVAWeighted
 
 setup(
-    name='PackageHPIParEGO',
+    name='pckg_hpi_parego',
     version='1',
 
     url='https://github.com/daphne12345/package_hpi_parego',
