@@ -15,7 +15,7 @@ from smac.utils.logging import get_logger
 __copyright__ = "Copyright 2022, automl.org"
 __license__ = "3-clause BSD"
 
-from weighted_mo_hpi.experiments.my_local_search import MyLocalSearch
+from my_local_search import MyLocalSearch
 
 logger = get_logger(__name__)
 
