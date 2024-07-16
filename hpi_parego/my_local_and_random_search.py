@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import carps
+
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from smac.acquisition.function import AbstractAcquisitionFunction
@@ -15,7 +17,7 @@ from smac.utils.logging import get_logger
 __copyright__ = "Copyright 2022, automl.org"
 __license__ = "3-clause BSD"
 
-from my_local_search import MyLocalSearch
+from hpi_parego.my_local_search import MyLocalSearch
 
 logger = get_logger(__name__)
 

@@ -97,6 +97,8 @@ class MyConfigSelector:
         self._runhistory_encoder = runhistory_encoder
         self._model = model
         self._acquisition_maximizer = acquisition_maximizer
+        outdir = self._scenario.output_directory
+        self._acquisition_maximizer._local_search.path_to_run = outdir
         self._acquisition_function = acquisition_function
         self._random_design = random_design
         self._callbacks = callbacks

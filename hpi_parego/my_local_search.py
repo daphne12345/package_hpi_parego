@@ -20,7 +20,7 @@ from smac.utils.logging import get_logger
 __copyright__ = "Copyright 2022, automl.org"
 __license__ = "3-clause BSD"
 
-from fanova import fANOVAWeighted
+from hpi_parego.fanova import fANOVAWeighted
 
 logger = get_logger(__name__)
 
@@ -139,6 +139,7 @@ class MyLocalSearch(LocalSearch):
         Y = self._acquisition_function._model.predict(X)
         # TODO get meta info or get path to current run
         # run = SMAC3v2Run(name='name', configspace=previous_configs[0].config_space, objectives=['1-accuracy', 'time'], meta=self.meta)
+        print(self.path_to_run)
         run = SMAC3v2Run.from_path(self.path_to_run)
         fanova = fANOVAWeighted(run)
         fanova.train_model(X, Y, weighting)
