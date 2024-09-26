@@ -144,8 +144,8 @@ class MyLocalSearch(LocalSearch):
         fanova = fANOVAWeighted(run)
         fanova.train_model(X, Y, weighting)
         df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
-        hps = df_res[df_res[0] > df_res[0].quantile(0.5)][
-            'index'].to_list()  # select hps over the 50% quantile of importance
+        hps = df_res[df_res[0] > df_res[0].quantile(0.5)]['index'].to_list()  # select hps over the 50% quantile of importance
+        # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
         return hps
 
     def _convert_full_to_reduced_configs(self, previous_configs, hps):
@@ -323,7 +323,7 @@ class MyLocalSearch(LocalSearch):
                             if acq_val[acq_index] > acq_val_candidates[i]:
                                 is_valid = False
                                 try:
-                                    neighbors[acq_index].is_valid_configuration()
+                                    neighbors[acq_index].check_valid_configuration() #is_valid_configuration()
                                     is_valid = True
                                 except (ValueError, ForbiddenValueError) as e:
                                     logger.debug("Local search %d: %s", i, e)
