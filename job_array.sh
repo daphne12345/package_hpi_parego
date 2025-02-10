@@ -29,3 +29,5 @@ srun \
   --container-mounts=/netscratch/theodorakopoulos:/netscratch/theodorakopoulos,"`pwd`":"`pwd`" \
   --task-prolog="`pwd`"/package_hpi_parego/install.sh \
    python -m carps.run +optimizer/smac20=multiobjective +problem/${problem} seed=${seed}
+
+#   cmd="python -m carps.analysis.gather_data runs"

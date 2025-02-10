@@ -1,5 +1,5 @@
 # @package _global_
-optimizer_id: HPI-ParEGO
+optimizer_id: HPI-ParEGO-50-quantile
 optimizer_container_id: SMAC3
 optimizer:
   smac_cfg:

@@ -91,17 +91,16 @@ class MyConfigSelector:
         acquisition_maximizer: AbstractAcquisitionMaximizer,
         acquisition_function: AbstractAcquisitionFunction,
         random_design: AbstractRandomDesign,
-        callbacks: list[Callback] = [],
+        callbacks: list[Callback] = None,
     ) -> None:
         self._runhistory = runhistory
         self._runhistory_encoder = runhistory_encoder
         self._model = model
         self._acquisition_maximizer = acquisition_maximizer
-        outdir = self._scenario.output_directory
-        self._acquisition_maximizer._local_search.path_to_run = outdir
+        self._acquisition_maximizer._local_search.path_to_run = None
         self._acquisition_function = acquisition_function
         self._random_design = random_design
-        self._callbacks = callbacks
+        self._callbacks = callbacks if callbacks is not None else []
 
         self._initial_design_configs = initial_design.select_configurations()
         if len(self._initial_design_configs) == 0:
@@ -171,6 +170,7 @@ class MyConfigSelector:
                 mo.update_on_iteration_start()
 
             X, Y, X_configurations = self._collect_data()
+            # TODO reduce data
             previous_configs = self._runhistory.get_configs()
 
             if X.shape[0] == 0:
@@ -179,7 +179,7 @@ class MyConfigSelector:
                 # the configspace.
                 logger.debug("No data available to train the model. Sample a random configuration.")
 
-                config = self._scenario.configspace.sample_configuration(1)
+                config = self._scenario.configspace.sample_configuration()
                 self._call_callbacks_on_end(config)
                 yield config
                 self._call_callbacks_on_start()
@@ -189,7 +189,7 @@ class MyConfigSelector:
 
             # Check if X/Y differs from the last run, otherwise use cached results
             if self._previous_entries != Y.shape[0]:
-                self._model.train(X, Y)
+                self._model.train(X, Y) # TODO
 
                 x_best_array: np.ndarray | None = None
                 if incumbent_value is not None:
@@ -212,6 +212,9 @@ class MyConfigSelector:
             # We want to cache how many entries we used because if we have the same number of entries
             # we don't need to train the next time
             self._previous_entries = Y.shape[0]
+
+            if self._acquisition_maximizer._local_search.path_to_run is None:
+                self._acquisition_maximizer._local_search.path_to_run = self._scenario.output_directory
 
             # Now we maximize the acquisition function
             challengers = self._acquisition_maximizer.maximize(
@@ -285,7 +288,7 @@ class MyConfigSelector:
             if X.shape[0] >= self._min_trials:
                 self._considered_budgets = [b]
 
-                # TODO: Add running configs
+                # Possible add running configs?
                 configs_array = self._runhistory_encoder.get_configurations(budget_subset=self._considered_budgets)
 
                 return X, Y, configs_array

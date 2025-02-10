@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-import copy
-import time
+from typing import Any
 
+import itertools
+import time
+import copy
 import numpy as np
 import pandas as pd
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.exceptions import ForbiddenValueError
 from deepcave.runs.converters.smac3v2 import SMAC3v2Run
+from pathlib import Path
 
 from smac.acquisition.function import AbstractAcquisitionFunction
 from smac.acquisition.maximizer import LocalSearch
@@ -17,7 +20,7 @@ from smac.utils.configspace import (
 )
 from smac.utils.logging import get_logger
 
-__copyright__ = "Copyright 2022, automl.org"
+__copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
 
 from hpi_parego.fanova import fANOVAWeighted
@@ -80,15 +83,28 @@ class MyLocalSearch(LocalSearch):
         self._vectorization_max_obtain = vectorization_max_obtain
         self.path_to_run = path_to_run
 
+    @property
+    def meta(self) -> dict[str, Any]:  # noqa: D102
+        meta = super().meta
+        meta.update(
+            {
+                "max_steps": self._max_steps,
+                "n_steps_plateau_walk": self._n_steps_plateau_walk,
+                "vectorization_min_obtain": self._vectorization_min_obtain,
+                "vectorization_max_obtain": self._vectorization_max_obtain,
+            }
+        )
+
+        return meta
     def _maximize(
-            self,
-            previous_configs: list[Configuration],
-            n_points: int,
-            additional_start_points: list[tuple[float, Configuration]] | None = None,
+        self,
+        previous_configs: list[Configuration],
+        n_points: int,
+        additional_start_points: list[tuple[float, Configuration]] | None = None,
     ) -> list[tuple[float, Configuration]]:
-        """Start a local search from the given startpoints. Iteratively collect neighbours
+        """Start a local search from the given start points. Iteratively collect neighbours
         using Configspace.utils.get_one_exchange_neighbourhood and evaluate them.
-        If the new config is better than the current best, the local search is coninued from the
+        If the new config is better than the current best, the local search is continued from the
         new config.
 
         Quit if either the max number of steps is reached or
@@ -137,8 +153,7 @@ class MyLocalSearch(LocalSearch):
         weighting = self._acquisition_function._theta
         X = convert_configurations_to_array(configs)
         Y = self._acquisition_function._model.predict(X)
-        # TODO get meta info or get path to current run
-        # run = SMAC3v2Run(name='name', configspace=previous_configs[0].config_space, objectives=['1-accuracy', 'time'], meta=self.meta)
+
         print(self.path_to_run)
         run = SMAC3v2Run.from_path(self.path_to_run)
         fanova = fANOVAWeighted(run)
@@ -159,6 +174,7 @@ class MyLocalSearch(LocalSearch):
         return reduced_cfgs
 
     def _set_irrelevant_to_default(self, previous_configs, hps):
+        #TODO test random values
         hps_default = list(set(previous_configs[0].config_space.get_hyperparameter_names())-set(hps))
         def_cfg = previous_configs[0].config_space.get_default_configuration()
         for hp in hps_default:
@@ -179,6 +195,129 @@ class MyLocalSearch(LocalSearch):
         #TODO test
         full_configs = [Configuration(full_cs, cfg) for cfg in reduced_configs]
         return full_configs
+
+
+    def _get_initial_points(
+        self,
+        previous_configs: list[Configuration],
+        n_points: int,
+        additional_start_points: list[tuple[float, Configuration]] | None,
+    ) -> list[Configuration]:
+        """Get initial points to start search from.
+
+        Parameters
+        ----------
+        previous_configs : list[Configuration]
+            Previous configuration (e.g., from the runhistory).
+        n_points : int
+            Number of initial points to be generated.
+        additional_start_points : list[tuple[float, Configuration]] | None
+            Additional starting points.
+
+        Returns
+        -------
+        list[Configuration]
+            A list of initial points/configurations.
+        """
+        sampled_points = []
+        init_points = []
+        n_init_points = n_points
+        if len(previous_configs) < n_points:
+            if n_points - len(previous_configs) == 1:
+                sampled_points = [self._configspace.sample_configuration()]
+            else:
+                sampled_points = self._configspace.sample_configuration(size=n_points - len(previous_configs))
+            n_init_points = len(previous_configs)
+            if not isinstance(sampled_points, list):
+                sampled_points = [sampled_points]
+        if len(previous_configs) > 0:
+            init_points = self._get_init_points_from_previous_configs(
+                previous_configs,
+                n_init_points,
+                additional_start_points,
+            )
+
+        return sampled_points + init_points
+
+    def _get_init_points_from_previous_configs(
+        self,
+        previous_configs: list[Configuration],
+        n_points: int,
+        additional_start_points: list[tuple[float, Configuration]] | None,
+    ) -> list[Configuration]:
+        """
+        Generate a set of initial points from the previous configurations and possibly additional points.
+
+        The idea is to decouple runhistory from the local search model and replace it with a more general
+        form (list[Configuration]). This is useful to more quickly collect new configurations
+        along the iterations, rather than feeding it to the runhistory every time.
+
+        create three lists and concatenate them:
+        1. sorted the previous configs by acquisition value
+        2. sorted the previous configs by marginal predictive costs
+        3. additional start points
+
+        and create a list that carries unique configurations only. Crucially,
+        when reading from left to right, all but the first occurrence of a configuration
+        are dropped.
+
+        Parameters
+        ----------
+        previous_configs: list[Configuration]
+            Previous configuration (e.g., from the runhistory).
+        n_points: int
+            Number of initial points to be generated; selected from previous configs (+ random configs if necessary).
+        additional_start_points: list[tuple[float, Configuration]] | None
+            Additional starting points.
+
+        Returns
+        -------
+        init_points: list[Configuration]
+            A list of initial points.
+        """
+        assert self._acquisition_function is not None
+
+        # configurations with the lowest predictive cost, check for None to make unit tests work
+        if self._acquisition_function.model is not None:
+            conf_array = convert_configurations_to_array(previous_configs)
+            costs = self._acquisition_function.model.predict_marginalized(conf_array)[0]
+            assert len(conf_array) == len(costs), (conf_array.shape, costs.shape)
+
+            # In case of the predictive model returning the prediction for more than one objective per configuration
+            # (for example multi-objective or EIPS) it is not immediately clear how to sort according to the cost
+            # of a configuration. Therefore, we simply follow the ParEGO approach and use a random scalarization.
+            if len(costs.shape) == 2 and costs.shape[1] > 1:
+                weights = np.array([self._rng.rand() for _ in range(costs.shape[1])])
+                weights = weights / np.sum(weights)
+                costs = costs @ weights
+
+            # From here: make argsort result to be random between equal values
+            # http://stackoverflow.com/questions/20197990/how-to-make-argsort-result-to-be-random-between-equal-values
+            random = self._rng.rand(len(costs))
+            indices = np.lexsort((random.flatten(), costs.flatten()))  # Last column is primary sort key!
+
+            # Cannot use zip here because the indices array cannot index the
+            # rand_configs list, because the second is a pure python list
+            previous_configs_sorted_by_cost = [previous_configs[ind] for ind in indices][:n_points]
+        else:
+            previous_configs_sorted_by_cost = []
+
+        if additional_start_points is not None:
+            additional_start_points = [asp[1] for asp in additional_start_points]
+        else:
+            additional_start_points = []
+
+        init_points = []
+        init_points_as_set: set[Configuration] = set()
+        for cand in itertools.chain(
+            previous_configs_sorted_by_cost,
+            additional_start_points,
+        ):
+            if cand not in init_points_as_set:
+                init_points.append(cand)
+                init_points_as_set.add(cand)
+
+        return init_points
 
     def _search(
         self,
@@ -267,6 +406,11 @@ class MyLocalSearch(LocalSearch):
 
         num_iters = 0
         while np.any(active):
+
+            # If the maximum number of steps is reached, stop the local search
+            if num_iters is not None and num_iters == self._max_steps:
+                break
+
             num_iters += 1
             # Whether the i-th local search improved. When a new neighborhood is generated, this is used to determine
             # whether a step was made (improvement) or not (iterator exhausted)
@@ -323,7 +467,7 @@ class MyLocalSearch(LocalSearch):
                             if acq_val[acq_index] > acq_val_candidates[i]:
                                 is_valid = False
                                 try:
-                                    neighbors[acq_index].check_valid_configuration() #is_valid_configuration()
+                                    neighbors[acq_index].check_valid_configuration()
                                     is_valid = True
                                 except (ValueError, ForbiddenValueError) as e:
                                     logger.debug("Local search %d: %s", i, e)
