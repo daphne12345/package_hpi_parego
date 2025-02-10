@@ -6,3 +6,6 @@ hpi_parego/smac3_output/*
 *.pyc
 *.json
 *.pdf
+.idea/package_hpi_parego.iml
+run.log
+*.egg-info
