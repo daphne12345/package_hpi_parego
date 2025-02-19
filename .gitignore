@@ -9,3 +9,4 @@ hpi_parego/smac3_output/*
 .idea/package_hpi_parego.iml
 run.log
 *.egg-info
+runs/*
