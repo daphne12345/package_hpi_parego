@@ -2,23 +2,31 @@ from __future__ import annotations
 
 from typing import Any
 
-from ConfigSpace import Configuration, ConfigurationSpace
+from ConfigSpace import Configuration, ConfigurationSpace, CategoricalHyperparameter, UniformFloatHyperparameter, NormalFloatHyperparameter, UniformIntegerHyperparameter, NormalIntegerHyperparameter, Constant
 
 from smac.acquisition.function import AbstractAcquisitionFunction
 from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
-# from smac.acquisition.maximizer.local_search import LocalSearch
+from smac.acquisition.maximizer.local_search import LocalSearch
 from smac.acquisition.maximizer.random_search import RandomSearch
 from smac.utils.logging import get_logger
+
+from hpi_parego.fanova import fANOVAWeighted
+from smac.utils.configspace import convert_configurations_to_array
+from deepcave.runs.converters.smac3v2 import SMAC3v2Run
+import pandas as pd
+import copy
+from typing import Dict
+from hypershap import HPIGame
+import shapiq
+import numpy as np
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
 
-from hpi_parego.my_local_search import MyLocalSearch
-
 logger = get_logger(__name__)
 
 
-class MyLocalAndSortedRandomSearch(AbstractAcquisitionMaximizer):
+class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     """Implement SMAC's default acquisition function optimization.
 
     This optimizer performs local search from the previous best points according to the acquisition
@@ -69,6 +77,8 @@ class MyLocalAndSortedRandomSearch(AbstractAcquisitionMaximizer):
             challengers=challengers,
             seed=seed,
         )
+        
+        self.path_to_run=path_to_run
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -93,18 +103,18 @@ class MyLocalAndSortedRandomSearch(AbstractAcquisitionMaximizer):
                 seed=seed,
             )
 
-        self._local_search = MyLocalSearch(
+        self._local_search = LocalSearch(
             configspace=configspace,
             acquisition_function=acquisition_function,
             max_steps=max_steps,
             n_steps_plateau_walk=n_steps_plateau_walk,
-            seed=seed,
-            path_to_run=path_to_run
+            seed=seed
         )
 
         self._local_search_iterations = local_search_iterations
         self._prior_sampling_fraction = prior_sampling_fraction
         self._uniform_configspace = uniform_configspace
+        
 
     @property
     def acquisition_function(self) -> AbstractAcquisitionFunction | None:  # noqa: D102
@@ -141,12 +151,60 @@ class MyLocalAndSortedRandomSearch(AbstractAcquisitionMaximizer):
             )
 
         return meta
+    
+    def _calculate_hpi(self, configs):
+        """Calcuulates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
 
+        Args:
+            configs (_type_): _description_
+
+        Returns:
+            _type_: list of important hps
+        """
+        weighting = self._acquisition_function._theta
+        X = convert_configurations_to_array(configs)
+        Y = self._acquisition_function._model.predict(X)
+
+        print(self.path_to_run)
+        run = SMAC3v2Run.from_path(self.path_to_run)
+        fanova = fANOVAWeighted(run)
+        fanova.train_model(X, Y, weighting)
+        df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
+        hps = df_res[df_res[0] > df_res[0].quantile(0.5)]['index'].to_list()  # select hps over the 50% quantile of importance
+        # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
+        return hps
+    
+    def _calculate_hpi_hypershap(self, previous_configs):
+        """Calcuulates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
+
+        Args:
+            configs (_type_): _description_
+
+        Returns:
+            _type_: list of important hps
+        """
+        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model, weighting=self._acquisition_function._theta)
+        # set up the computer
+        computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
+    
+        mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
+        thresh = np.quantile(mi_values.values, 0.75)
+        coas = [(co, len(co[0])) for co in (mi_values.get_top_k(10).dict_values.items()) if co[1]>=thresh]
+        min_coa = list(min(coas, key=lambda x: x[1])[0][0])
+        important_hps = [self._configspace.get_hyperparameter_names()[i] for i in min_coa]
+        return important_hps
+    
     def _maximize(
         self,
         previous_configs: list[Configuration],
         n_points: int,
     ) -> list[tuple[float, Configuration]]:
+        
+        # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
+        # hps = self._calculate_hpi(previous_configs)
+        hps = self._calculate_hpi_hypershap(previous_configs)
+
+        self.adjust_configspace(hps)
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
             # Get configurations sorted by acquisition function value
@@ -190,3 +248,71 @@ class MyLocalAndSortedRandomSearch(AbstractAcquisitionMaximizer):
         logger.debug(f"First 5 acquisition function values of selected configurations: \n{', '.join(first_five)}")
 
         return next_configs_by_acq_value
+    
+       
+    def adjust_configspace(self, important_hps):
+        """Sets all unimportant hyperparameters in all configspaces of local and random search to be very unlikely.
+
+        Args:
+            important_hps (_type_): list of important hyperpamaters
+        """
+        print('adjust configspace')
+        cs = copy.deepcopy(self._local_search._configspace)
+        random_state = cs.random.get_state()
+        new_cs = ConfigurationSpace()
+        new_cs.random.set_state(random_state)
+
+        for hp in cs.values():
+            if hp.name in important_hps:
+                try:
+                    new_cs.add(hp)
+                except:
+                    new_cs.add_hyperparameter(hp)
+            else:
+                new_hp = Constant(
+                    name=hp.name,
+                    value=hp.default_value
+                )
+                
+                # if isinstance(hp, CategoricalHyperparameter):
+                #     new_weights = [1 if choice == hp.default_value else 0 for choice in hp.choices]
+                #     new_hp = CategoricalHyperparameter(
+                #         name=hp.name,
+                #         choices=hp.choices,
+                #         default_value=hp.default_value,
+                #         weights=new_weights,
+                #     )
+                # elif isinstance(hp, (UniformFloatHyperparameter, NormalFloatHyperparameter)):
+                #     new_hp = NormalFloatHyperparameter(
+                #         name=hp.name,
+                #         lower=hp.lower,
+                #         upper=hp.upper,
+                #         mu=hp.default_value,
+                #         sigma=(hp.upper - hp.lower)/10000000000,
+                #         log=hp.log,
+                #     )
+                # elif isinstance(hp, UniformIntegerHyperparameter):                
+                #     new_hp = NormalIntegerHyperparameter(
+                #         name=hp.name,
+                #         lower=hp.lower,
+                #         upper=hp.upper,
+                #         mu=hp.default_value,
+                #         sigma=(hp.upper - hp.lower)/10000000000,
+                #         log=hp.log,
+                #     )
+                    
+                # else:
+                #     new_hp = hp
+                #     print(f"Hyperparameter {hp} not supported. Using old hp values.")
+
+                try:
+                    new_cs.add(new_hp)
+                except:
+                    new_cs.add_hyperparameter(new_hp)
+        self._configspace = new_cs
+        self._local_search._configspace = new_cs
+        if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
+            self._prior_random_search._configspace = new_cs
+            self._uniform_random_search._configspace = new_cs
+        else:  
+            self._random_search._configspace = new_cs

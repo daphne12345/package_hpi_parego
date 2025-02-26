@@ -26,7 +26,7 @@ __license__ = "3-clause BSD"
 
 from hpi_parego.my_config_selector import MyConfigSelector
 from hpi_parego.my_ei_hpi import MyEI
-from hpi_parego.my_local_and_random_search import MyLocalAndSortedRandomSearch
+from hpi_parego.my_local_and_random_search_configspace import MyLocalAndSortedRandomSearchConfigSpace
 
 digits = load_digits()
 
@@ -56,9 +56,9 @@ class MLP:
         return cs
 
     def train(self, config: Configuration, seed: int = 0, budget: int = 10) -> dict[str, float]:
-        # lr = config.get("learning_rate", "constant")
-        # lr_init = config.get("learning_rate_init", 0.001)
-        # batch_size = config.get("batch_size", 200)
+        lr = config.get("learning_rate", "constant")
+        lr_init = config.get("learning_rate_init", 0.001)
+        batch_size = config.get("batch_size", 200)
 
         start_time = time.time()
 
@@ -97,6 +97,8 @@ if __name__ == "__main__":
         walltime_limit=300,  # After 30 seconds, we stop the hyperparameter optimization
         n_trials=200,  # Evaluate max 200 different trials
         n_workers=1,
+        name='smac3output',
+        output_directory='test'
     )
 
     # We want to run five random configurations before starting the optimization.
@@ -105,7 +107,7 @@ if __name__ == "__main__":
     intensifier = HPOFacade.get_intensifier(scenario, max_config_calls=2)
 
     my_acquisition_function = MyEI()
-    my_maximizer = MyLocalAndSortedRandomSearch(mlp.configspace, my_acquisition_function)
+    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory)
     my_config_selector = MyConfigSelector(scenario)
 
     # Create our SMAC object and pass the scenario and the train method

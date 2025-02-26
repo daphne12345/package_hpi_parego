@@ -1,7 +1,6 @@
 #!/bin/bash
 
-problems=('Pymoo/MO=zdt1' 'Pymoo/MO=zdt2' 'Pymoo/MO=zdt3' 'Pymoo/MO=zdt4' 'Pymoo/MO=zdt5' 'Pymoo/MO=zdt6' 'Pymoo/MO=kursawe' 'Pymoo/MO=omnitest' 'Pymoo/MO=sympart' 'Pymoo/MO=sympart_rotated')
-#problems=('YAHPO/MO=cfg_iaml_glmnet_1067' 'YAHPO/MO=cfg_iaml_ranger_1489' 'YAHPO/MO=cfg_iaml_super_1489' 'YAHPO/MO=cfg_iaml_xgboost_40981' 'YAHPO/MO=cfg_lcbench_189873' 'Pymoo/MO=zdt1' 'Pymoo/MO=zdt2' 'Pymoo/MO=zdt3' 'Pymoo/MO=zdt4' 'Pymoo/MO=zdt5')
+problems=('Pymoo/MO=zdt1' 'Pymoo/MO=zdt2' 'Pymoo/MO=zdt3' 'Pymoo/MO=zdt4' 'Pymoo/MO=zdt5' 'Pymoo/MO=zdt6' 'Pymoo/MO=kursawe' 'Pymoo/MO=omnitest' 'Pymoo/MO=sympart' 'Pymoo/MO=sympart_rotated' 'YAHPO/MO=cfg_iaml_glmnet_1067' 'YAHPO/MO=cfg_iaml_ranger_1489' 'YAHPO/MO=cfg_iaml_super_1489' 'YAHPO/MO=cfg_iaml_xgboost_40981' 'YAHPO/MO=cfg_lcbench_189873')
 #problems=('MFPBench/MO/pd1=cifar100_wideresnet_2048' 'MFPBench/MO/pd1=imagenet_resnet_512' 'MFPBench/MO/pd1=lm1b_transformer_2048' 'MFPBench/MO/pd1=translatewmt_xformer_64')
 
 #problems=('subselection/multiobjective/dev=subset_Pymoo_MO_omnitest' 'subselection/multiobjective/dev=subset_hpobench_MO_tab_ml_rf_167119' 'subselection/multiobjective/dev=subset_hpobench_MO_tab_ml_rf_31' 'subselection/multiobjective/dev=subset_hpobench_MO_tab_ml_svm_146212'
@@ -30,3 +29,8 @@ done
 cmd="python -m carps.analysis.gather_data runs"
 $cmd
 
+
+
+python -m carps.run hydra.searchpath=[pkg://hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego '+problem/YAHPO/MO=glob(*)' 'seed=range(0,5)' -m
+
+python -m carps.run hydra.searchpath=[pkg://hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego '+problem/Pymoo/MO=glob(*)' 'seed=range(0,5)' -m

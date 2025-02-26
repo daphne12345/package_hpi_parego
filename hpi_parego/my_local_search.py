@@ -130,8 +130,8 @@ class MyLocalSearch(LocalSearch):
         # reduced_cfgs = self._convert_full_to_reduced_configs(previous_configs, hps)
         # converted_configs, cfg_dict = self._set_irrelevant_to_default(previous_configs, hps)
         # additional_start_points = [(point, self._set_irrelevant_to_default([cfg], hps)[0]) for (point, cfg) in additional_start_points]
-        # init_points = self._get_initial_points(converted_configs, n_points, additional_start_points) #TODO X needs to be reduced
-        init_points = self._get_initial_points(previous_configs, n_points, additional_start_points) #TODO X needs to be reduced
+        # init_points = self._get_initial_points(converted_configs, n_points, additional_start_points)
+        init_points = self._get_initial_points(previous_configs, n_points, additional_start_points)
         converted_configs, cfg_dict = self._set_irrelevant_to_default(init_points, hps)
         configs_acq = self._search(converted_configs)
         # configs_acq = self._convert_reduced_to_full_configs_hpi(configs_acq, previous_configs[0].config_space)
