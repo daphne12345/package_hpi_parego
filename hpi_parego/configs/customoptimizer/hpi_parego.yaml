@@ -10,6 +10,12 @@ optimizer:
       acquisition_maximizer:
         _target_: hpi_parego.my_local_and_random_search_configspace.MyLocalAndSortedRandomSearchConfigSpace
         _partial_: true
+        path_to_run: ${optimizer.smac_cfg.scenario.output_directory}/${optimizer.smac_cfg.scenario.name}/${optimizer.smac_cfg.scenario.seed}
+        adjust_cs: true
+        hpi_mehtod: fanova
+        constant: true
+        adjust_previous_cfgs: false
+        set_to_default: true        
       acquisition_function:
         _target_: hpi_parego.my_ei_hpi.MyEI
       config_selector:
