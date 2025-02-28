@@ -12,7 +12,7 @@ optimizer:
         _partial_: true
         path_to_run: ${optimizer.smac_cfg.scenario.output_directory}/${optimizer.smac_cfg.scenario.name}/${optimizer.smac_cfg.scenario.seed}
         adjust_cs: true
-        hpi_mehtod: fanova
+        hpi_method: fanova
         constant: true
         adjust_previous_cfgs: false
         set_to_default: true        
