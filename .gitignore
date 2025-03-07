@@ -10,3 +10,6 @@ hpi_parego/smac3_output/*
 run.log
 *.egg-info
 runs/*
+*.err
+*.out
+*.conda

@@ -34,3 +34,6 @@ $cmd
 python -m carps.run hydra.searchpath=[pkg://hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego '+problem/YAHPO/MO=glob(*)' 'seed=range(0,5)' -m
 
 python -m carps.run hydra.searchpath=[pkg://hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego '+problem/Pymoo/MO=glob(*)' 'seed=range(0,5)' -m
+
+
+python -m carps.run hydra.searchpath=[pkg://hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego +problem/YAHPO/MO=cfg_iaml_ranger_1489 seed=0

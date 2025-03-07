@@ -214,11 +214,10 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     ) -> list[tuple[float, Configuration]]:
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
-        # if self.hpi=='fanova':
-        #     important_hps = self._calculate_hpi_fanova(previous_configs)
-        # else:
-        #     important_hps = self._calculate_hpi_hypershap(previous_configs)
-        important_hps=['n_neurons', 'solver']
+        if self.hpi=='fanova':
+            important_hps = self._calculate_hpi_fanova(previous_configs)
+        else:
+            important_hps = self._calculate_hpi_hypershap(previous_configs)
 
         if self.adjust_cs:
             self.adjust_configspace(important_hps)
