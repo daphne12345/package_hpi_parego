@@ -218,11 +218,11 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             important_hps = self._calculate_hpi_fanova(previous_configs)
         else:
             important_hps = self._calculate_hpi_hypershap(previous_configs)
-
-        if self.adjust_cs:
-            self.adjust_configspace(important_hps)
-        if self.adjust_previous_cfgs:
-            previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
+        if len(important_hps) > 0:
+            if self.adjust_cs:
+                self.adjust_configspace(important_hps)
+            if self.adjust_previous_cfgs:
+                previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
             # Get configurations sorted by acquisition function value
@@ -328,6 +328,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                     new_cs.add(new_hp)
                 except:
                     new_cs.add_hyperparameter(new_hp)
+        if not self.constant:
+            new_cs.add_conditions(cs.get_conditions())
+        
         self._configspace = new_cs
         self._local_search._configspace = new_cs
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
@@ -352,7 +355,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         else: # random augmentation
             for _ in range(5):
                 random_cfgs = self._original_cs.sample_configuration(len(previous_configs))
+                new_cfgs = []
                 for hp in important_hps:
-                    new_cfgs = [self.update(new_cfg, hp, old_cfg[hp]) for new_cfg, old_cfg in zip(random_cfgs, previous_configs)]
+                    new_cfgs += [self.update(new_cfg, hp, old_cfg[hp]) for new_cfg, old_cfg in zip(random_cfgs, previous_configs)]
                 converted_configs += new_cfgs
         return converted_configs

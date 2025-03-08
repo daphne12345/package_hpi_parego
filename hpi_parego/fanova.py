@@ -14,7 +14,7 @@ class fANOVAWeighted(fANOVA):
             raise RuntimeError("The run needs to be initialized.")
 
         super().__init__(run)
-        self.n_trees = 100
+        self.n_trees = 10
 
     def train_model(
             self,
@@ -28,6 +28,14 @@ class fANOVAWeighted(fANOVA):
         :param weighting: the weighting as list
         """
         # X = df[group.configspace.get_hyperparameter_names()].to_numpy()
+        if np.isnan(X).any():
+            # Fill NaNs with column means
+            int_rows = np.all(X.astype(int) == X, axis=0)
+            X[np.isnan(X)] = np.take(np.nanmean(X, axis=0), np.where(np.isnan(X))[1])
+
+            # Convert only integer-like columns back to int
+            X[:, int_rows] = X[:, int_rows].astype(int)
+
         Y = sum(obj * weighting for obj, weighting in zip(Y, weighting))
 
         self._model = FanovaForest(self.cs, n_trees=self.n_trees, seed=0)
