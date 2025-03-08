@@ -1,6 +1,7 @@
 from deepcave.evaluators.epm.fanova_forest import FanovaForest
 from deepcave.evaluators.fanova import fANOVA
 from deepcave.runs import AbstractRun
+import numpy as np
 
 
 class fANOVAWeighted(fANOVA):

@@ -341,7 +341,11 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     
     def update(self, cfg, hp, value):
         cfg_change =  copy.copy(cfg)
-        cfg_change[hp] = value
+        try:
+            cfg_change[hp] = value
+        except Exception as e:
+            print(e)
+            print(f'Could not set {hp} with value {value}.')
         return cfg_change
     
     def adjust_previous_configs(self, previous_configs, important_hps):
@@ -355,8 +359,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         else: # random augmentation
             for _ in range(5):
                 random_cfgs = self._original_cs.sample_configuration(len(previous_configs))
-                new_cfgs = []
                 for hp in important_hps:
-                    new_cfgs += [self.update(new_cfg, hp, old_cfg[hp]) for new_cfg, old_cfg in zip(random_cfgs, previous_configs)]
-                converted_configs += new_cfgs
+                    random_cfgs = [self.update(new_cfg, hp, old_cfg[hp]) for new_cfg, old_cfg in zip(random_cfgs, previous_configs)]
+                converted_configs += random_cfgs
         return converted_configs
