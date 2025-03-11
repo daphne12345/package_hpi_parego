@@ -15,7 +15,10 @@ optimizer:
         hpi_method: hypershap
         constant: true
         adjust_previous_cfgs: false
-        set_to_default: true        
+        set_to_default: true   
+        thresh: 0.5
+        dynamic_decay: linear # or linear 
+        n_trials: ${optimizer.smac_cfg.scenario.n_trials}   
       acquisition_function:
         _target_: hpi_parego.my_ei_hpi.MyEI
       config_selector:

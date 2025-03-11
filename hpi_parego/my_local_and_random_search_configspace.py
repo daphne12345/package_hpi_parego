@@ -74,6 +74,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         hpi_method='hypershap',
         adjust_previous_cfgs=False,
         set_to_default=False,
+        thresh=0.5,
+        dynamic_decay='linear',
+        n_trials=100,
         path_to_run=None
     ) -> None:
         super().__init__(
@@ -91,7 +94,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.hpi=hpi_method # fanova or hypershap
         self.adjust_previous_cfgs = adjust_previous_cfgs # whther to adjust the previous configs for search
         self.set_to_default = set_to_default # whether to adjust the previous configs by setting the unimportant hps to default or random augmentation
-        
+        self.thresh = thresh # threshold for quantile cut off for hpi
+        self.dynamic_decay = dynamic_decay
+        self.n_trials = n_trials
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -183,7 +188,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         fanova = fANOVAWeighted(run)
         fanova.train_model(X, Y, weighting)
         df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
-        important_hps = df_res[df_res[0] > df_res[0].quantile(0.5)]['index'].to_list()  # select hps over the 50% quantile of importance
+        important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
         # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
         return important_hps
     
@@ -204,7 +209,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         else:
             approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
             mi_values = approximator.approximate(budget=100*hpo_game.n_players, game=hpo_game)
-        thresh = np.quantile(mi_values.values, 0.5)
+        thresh = np.quantile(mi_values.values, self.thresh)
         coas = [(co, len(co[0])) for co in (mi_values.get_top_k(10).dict_values.items()) if co[1]>=thresh]
         if len(coas)==0:
             return []
@@ -221,6 +226,12 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
         logger.info(self.hpi)
+        if self.dynamic_decay=='linear':
+            run = SMAC3v2Run.from_path(self.path_to_run)
+            current_trial = len(run.trial_keys)
+            pos = np.floor(current_trial / (self.n_trials//7))
+            thresh_list = [0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+            self.thresh = thresh_list[pos]
         if self.hpi=='fanova':
             important_hps = self._calculate_hpi_fanova(previous_configs)
         else:
