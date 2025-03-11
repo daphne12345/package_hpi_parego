@@ -71,7 +71,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         prior_sampling_fraction: float | None = None,
         adjust_cs=True,
         constant=True,
-        hpi_method='fanova',
+        hpi_method='hypershap',
         adjust_previous_cfgs=False,
         set_to_default=False,
         path_to_run=None
@@ -198,16 +198,20 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         """
         hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model, weighting=self._acquisition_function._theta)
         # set up the computer
-        computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
-    
-        mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
-        thresh = np.quantile(mi_values.values, 0.75)
+        if hpo_game.n_players < 15:
+            computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
+            mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
+        else:
+            approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
+            mi_values = approximator.approximate(budget=100*hpo_game.n_players, game=hpo_game)
+        thresh = np.quantile(mi_values.values, 0.5)
         coas = [(co, len(co[0])) for co in (mi_values.get_top_k(10).dict_values.items()) if co[1]>=thresh]
         if len(coas)==0:
             return []
         min_coa = list(min(coas, key=lambda x: x[1])[0][0])
         important_hps = [self._configspace.get_hyperparameter_names()[i] for i in min_coa]
         return important_hps
+       
     
     def _maximize(
         self,
@@ -216,6 +220,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     ) -> list[tuple[float, Configuration]]:
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
+        logger.info(self.hpi)
         if self.hpi=='fanova':
             important_hps = self._calculate_hpi_fanova(previous_configs)
         else:
