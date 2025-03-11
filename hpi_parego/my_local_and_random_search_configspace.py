@@ -203,6 +203,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
         thresh = np.quantile(mi_values.values, 0.75)
         coas = [(co, len(co[0])) for co in (mi_values.get_top_k(10).dict_values.items()) if co[1]>=thresh]
+        if len(coas)==0:
+            return []
         min_coa = list(min(coas, key=lambda x: x[1])[0][0])
         important_hps = [self._configspace.get_hyperparameter_names()[i] for i in min_coa]
         return important_hps

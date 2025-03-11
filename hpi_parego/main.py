@@ -107,8 +107,8 @@ if __name__ == "__main__":
     intensifier = HPOFacade.get_intensifier(scenario, max_config_calls=2)
 
     my_acquisition_function = MyEI()
-    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, adjust_cs=False, constant=True, hpi_method='fanova',
-        adjust_previous_cfgs=True, set_to_default=False)
+    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, adjust_cs=False, constant=True, hpi_method='hypershap',
+        adjust_previous_cfgs=False, set_to_default=False)
     my_config_selector = MyConfigSelector(scenario)
 
     # Create our SMAC object and pass the scenario and the train method
