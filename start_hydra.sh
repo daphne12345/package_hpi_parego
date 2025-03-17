@@ -7,7 +7,7 @@
 #SBATCH --nodes=1
 #SBATCH --time=6:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=32GB
+#SBATCH --mem=16GB
 
 commit_hash=$(git log -1 --pretty=format:"%h")
 

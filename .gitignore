@@ -13,3 +13,7 @@ runs/*
 *.err
 *.out
 *.conda
+cs_adjust_t_fanova_constant_f_adjust_prev_f_default_f/*
+cs_adjust_t_fanova_constant_t_adjust_prev_f_default_f/*
+cs_adjust_t_fanova_constant_t_adjust_prev_t_default_f/*
+cs_adjust_t_fanova_constant_t_adjust_prev_t_default_t/*

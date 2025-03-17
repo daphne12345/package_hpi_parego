@@ -75,7 +75,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         adjust_previous_cfgs=False,
         set_to_default=False,
         thresh=0.5,
-        dynamic_decay='linear',
+        dynamic_decay=None,
         n_trials=100,
         path_to_run=None
     ) -> None:
