@@ -230,7 +230,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             run = SMAC3v2Run.from_path(self.path_to_run)
             current_trial = len(run.trial_keys)
             pos = np.floor(current_trial / (self.n_trials//7))
-            thresh_list = [0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+            thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
             self.thresh = thresh_list[pos]
         if self.hpi=='fanova':
             important_hps = self._calculate_hpi_fanova(previous_configs)
