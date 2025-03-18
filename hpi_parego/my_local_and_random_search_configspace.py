@@ -19,6 +19,7 @@ from typing import Dict
 from hypershap import HPIGame
 import shapiq
 import numpy as np
+import random
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -171,7 +172,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         return meta
     
     def _calculate_hpi_fanova(self, configs):
-        """Calcuulates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
+        """Calculates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
 
         Args:
             configs (_type_): _description_
@@ -191,6 +192,11 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
         # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
         return important_hps
+    
+    def _random_selection(self):
+        hps = self._configspace.get_hyperparameter_names()
+        n_hps =  np.round((1 - self.thresh) * len(hps))
+        return random.sample(hps, n_hps)
     
     def _calculate_hpi_hypershap(self, previous_configs):
         """Calcuulates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
@@ -234,6 +240,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             self.thresh = thresh_list[pos]
         if self.hpi=='fanova':
             important_hps = self._calculate_hpi_fanova(previous_configs)
+        elif self.hpi=='random':
+            important_hps = self._random_selection()
         else:
             important_hps = self._calculate_hpi_hypershap(previous_configs)
         if len(important_hps) > 0:
