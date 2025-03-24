@@ -26,7 +26,9 @@ __license__ = "3-clause BSD"
 
 from hpi_parego.my_config_selector import MyConfigSelector
 from hpi_parego.my_ei_hpi import MyEI
+from hpi_parego.my_runhistroy_encoder import MyRunHistoryEncoder
 from hpi_parego.my_local_and_random_search_configspace import MyLocalAndSortedRandomSearchConfigSpace
+import random 
 
 digits = load_digits()
 
@@ -46,19 +48,19 @@ class MLP:
 
         cs.add_hyperparameters([n_layer, n_neurons, activation, solver, batch_size, learning_rate, learning_rate_init])
 
-        use_lr = EqualsCondition(child=learning_rate, parent=solver, value="sgd")
-        use_lr_init = InCondition(child=learning_rate_init, parent=solver, values=["sgd", "adam"])
-        use_batch_size = InCondition(child=batch_size, parent=solver, values=["sgd", "adam"])
+        # use_lr = EqualsCondition(child=learning_rate, parent=solver, value="sgd")
+        # use_lr_init = InCondition(child=learning_rate_init, parent=solver, values=["sgd", "adam"])
+        # use_batch_size = InCondition(child=batch_size, parent=solver, values=["sgd", "adam"])
 
         # We can also add multiple conditions on hyperparameters at once:
-        cs.add_conditions([use_lr, use_batch_size, use_lr_init])
+        # cs.add_conditions([use_lr, use_batch_size, use_lr_init])
 
         return cs
 
     def train(self, config: Configuration, seed: int = 0, budget: int = 10) -> dict[str, float]:
-        lr = config["learning_rate"] if config["learning_rate"] else  "constant"
-        lr_init = config["learning_rate_init"] if config["learning_rate_init"] else  0.001
-        batch_size = config["batch_size"] if config["batch_size"] else  200
+        # lr = config["learning_rate"] if config["learning_rate"] else  "constant"
+        # lr_init = config["learning_rate_init"] if config["learning_rate_init"] else  0.001
+        # batch_size = config["batch_size"] if config["batch_size"] else  200
 
         start_time = time.time()
 
@@ -68,10 +70,10 @@ class MLP:
             classifier = MLPClassifier(
                 hidden_layer_sizes=[config["n_neurons"]] * config["n_layer"],
                 solver=config["solver"],
-                batch_size=batch_size,
+                batch_size=config["batch_size"],
                 activation=config["activation"],
-                learning_rate=lr,
-                learning_rate_init=lr_init,
+                learning_rate=config["learning_rate"],
+                learning_rate_init=config["learning_rate_init"],
                 max_iter=int(np.ceil(budget)),
                 random_state=seed,
             )
@@ -107,9 +109,10 @@ if __name__ == "__main__":
     intensifier = HPOFacade.get_intensifier(scenario, max_config_calls=2)
 
     my_acquisition_function = MyEI()
-    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, adjust_cs=False, constant=True, hpi_method='hypershap',
-        adjust_previous_cfgs=False, set_to_default=False)
     my_config_selector = MyConfigSelector(scenario)
+    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, adjust_cs=True, constant=False, hpi_method='fanova',
+        adjust_previous_cfgs=False, adjust_cs_method='random', set_to_default=False)
+    
 
     # Create our SMAC object and pass the scenario and the train method
     smac = HPOFacade(
