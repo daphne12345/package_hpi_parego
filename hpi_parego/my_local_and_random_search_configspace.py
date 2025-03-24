@@ -20,6 +20,9 @@ from hypershap import HPIGame
 import shapiq
 import numpy as np
 import random
+from itertools import combinations
+from collections import defaultdict
+import pickle as pckl
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -61,7 +64,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
 
     def __init__(
         self,
-        configspace: ConfigurationSpace,
+        configspace: ConfigurationSpace=ConfigurationSpace(),
         acquisition_function: AbstractAcquisitionFunction | None = None,
         challengers: int = 5000,
         max_steps: int | None = None,
@@ -77,7 +80,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         set_to_default=False,
         thresh=0.5,
         dynamic_decay=None,
+        adjust_cs_method=None,
         n_trials=100,
+        thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3],
         path_to_run=None
     ) -> None:
         super().__init__(
@@ -98,6 +103,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.thresh = thresh # threshold for quantile cut off for hpi
         self.dynamic_decay = dynamic_decay
         self.n_trials = n_trials
+        self.important_hps = []
+        self.thresh_list = thresh_list
+        self.adjust_cs_method = adjust_cs_method
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -180,14 +188,13 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         Returns:
             _type_: list of important hps
         """
-        weighting = self._acquisition_function._theta
         X = convert_configurations_to_array(configs)
-        Y = self._acquisition_function._model.predict(X)
+        Y,_ = self._acquisition_function._model.predict(X)
 
         print('Path', self.path_to_run)
         run = SMAC3v2Run.from_path(self.path_to_run)
         fanova = fANOVAWeighted(run)
-        fanova.train_model(X, Y, weighting)
+        fanova.train_model(X, Y)
         df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
         important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
         # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
@@ -195,8 +202,17 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     
     def _random_selection(self):
         hps = self._configspace.get_hyperparameter_names()
-        n_hps =  np.round((1 - self.thresh) * len(hps))
+        n_hps =  int(np.round((1 - self.thresh) * len(hps)))
         return random.sample(hps, n_hps)
+    
+    def sum_mi_values_higher(self, values):
+        result = defaultdict(float, values)
+        indices = sorted({i for key in values for i in key})
+
+        for size in range(2, len(indices) + 1):
+            for comb in combinations(indices, size):
+                result[comb] = sum(values[key] for key in values if set(key).issubset(comb))
+        return dict(result)
     
     def _calculate_hpi_hypershap(self, previous_configs):
         """Calcuulates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
@@ -207,16 +223,20 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         Returns:
             _type_: list of important hps
         """
-        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model, weighting=self._acquisition_function._theta)
+        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model)
         # set up the computer
         if hpo_game.n_players < 15:
             computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
-            mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
+            # mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
+            mi_values = computer.shapley_interaction(index="FSII", order=2)                     
         else:
             approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
             mi_values = approximator.approximate(budget=100*hpo_game.n_players, game=hpo_game)
-        thresh = np.quantile(mi_values.values, self.thresh)
-        coas = [(co, len(co[0])) for co in (mi_values.get_top_k(10).dict_values.items()) if co[1]>=thresh]
+        mi_values = dict(zip(mi_values.interaction_lookup, mi_values.values))
+        coas = self.sum_mi_values_higher(mi_values)
+        thresh = np.quantile(list(coas.values()), self.thresh) 
+        thresh = thresh if thresh > 0 else 0
+        coas = [(co, len(co[0])) for co in (coas.items()) if co[1]>thresh]
         if len(coas)==0:
             return []
         min_coa = list(min(coas, key=lambda x: x[1])[0][0])
@@ -236,14 +256,23 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             run = SMAC3v2Run.from_path(self.path_to_run)
             current_trial = len(run.trial_keys)
             pos = np.floor(current_trial / (self.n_trials//7))
-            thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
-            self.thresh = thresh_list[pos]
+            # thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
+            self.thresh = self.thresh_list[pos]
         if self.hpi=='fanova':
-            important_hps = self._calculate_hpi_fanova(previous_configs)
+            if random.choice(range(0,100))<10:
+                important_hps = self._random_selection()
+            else:
+                important_hps = self._calculate_hpi_fanova(previous_configs)
         elif self.hpi=='random':
             important_hps = self._random_selection()
         else:
-            important_hps = self._calculate_hpi_hypershap(previous_configs)
+            if random.choice(range(0,100))<10:
+                important_hps = self._random_selection()
+            else:
+                important_hps = self._calculate_hpi_hypershap(previous_configs)
+        self.important_hps.append(important_hps)
+        if len(self.important_hps)%10==0:
+            pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
         if len(important_hps) > 0:
             if self.adjust_cs:
                 self.adjust_configspace(important_hps)
@@ -313,18 +342,19 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 except:
                     new_cs.add_hyperparameter(hp)
             else:
+                hp_value = hp.default_value if self.adjust_cs_method=='default' else hp.sample_value()
                 if self.constant:
                     new_hp = Constant(
                         name=hp.name,
-                        value=hp.default_value
+                        value=hp_value
                     )
                 else: #distribution
                     if isinstance(hp, CategoricalHyperparameter):
-                        new_weights = [1 if choice == hp.default_value else 0 for choice in hp.choices]
+                        new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
                         new_hp = CategoricalHyperparameter(
                             name=hp.name,
                             choices=hp.choices,
-                            default_value=hp.default_value,
+                            default_value=hp_value,
                             weights=new_weights,
                         )
                     elif isinstance(hp, (UniformFloatHyperparameter, NormalFloatHyperparameter)):
@@ -332,7 +362,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                             name=hp.name,
                             lower=hp.lower,
                             upper=hp.upper,
-                            mu=hp.default_value,
+                            mu=hp_value,
                             sigma=(hp.upper - hp.lower)/10000000000,
                             log=hp.log,
                         )
@@ -341,7 +371,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                             name=hp.name,
                             lower=hp.lower,
                             upper=hp.upper,
-                            mu=hp.default_value,
+                            mu=hp_value,
                             sigma=(hp.upper - hp.lower)/10000000000,
                             log=hp.log,
                         )
