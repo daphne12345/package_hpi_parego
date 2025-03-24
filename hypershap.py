@@ -14,7 +14,6 @@ class HPIGame(Game, ABC):
         cs,
         cfgs,
         model,
-        weighting,
         aggregator=lambda x: np.mean(np.array(x)),
         random_state=0,
         verbose = False,
@@ -25,7 +24,6 @@ class HPIGame(Game, ABC):
         self.cfgs = cfgs
         self.aggregator = aggregator
         self._model = model
-        self.weighting = weighting
         # determine empty coalition value for normalization
         super().__init__(
             n_players=len(cs.get_hyperparameters()),
@@ -37,8 +35,7 @@ class HPIGame(Game, ABC):
 
     def get_default_config_performance(self) -> float:
         X = convert_configurations_to_array([self.cs.get_default_configuration()])
-        Y = self._model.predict(X)
-        Y = sum(obj * weighting for obj, weighting in zip(Y, self.weighting))
+        Y, _ = self._model.predict(X)
         return self.aggregator(Y)
         
     def _before_first_value_function_hook(self):
@@ -63,8 +60,7 @@ class HPIGame(Game, ABC):
         cfgs = self.blind_parameters_according_to_coalition(self.cfgs, coalition)
         
         X = convert_configurations_to_array(cfgs)
-        Y = self._model.predict(X)
-        Y = sum(obj * weighting for obj, weighting in zip(Y, self.weighting))
+        Y,_ = self._model.predict(X)
         return self.aggregator(Y)
 
     def blind_parameters_according_to_coalition(self, cfgs, coalition):

@@ -19,14 +19,13 @@ class fANOVAWeighted(fANOVA):
 
     def train_model(
             self,
-            X, Y, weighting
+            X, Y
     ) -> None:
         """
         Train a FANOVA Forest model where the objectives are weighted by the input weighting.
         :param group: the runs as group
         :param df: dataframe containing the encoded data
         :param objectives_normed: the normalized objective names as a list of strings
-        :param weighting: the weighting as list
         """
         # X = df[group.configspace.get_hyperparameter_names()].to_numpy()
         if np.isnan(X).any():
@@ -36,8 +35,5 @@ class fANOVAWeighted(fANOVA):
 
             # Convert only integer-like columns back to int
             X[:, int_rows] = X[:, int_rows].astype(int)
-
-        Y = sum(obj * weighting for obj, weighting in zip(Y, weighting))
-
         self._model = FanovaForest(self.cs, n_trees=self.n_trees, seed=0)
         self._model.train(X, Y)
