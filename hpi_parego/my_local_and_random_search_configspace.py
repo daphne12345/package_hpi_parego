@@ -255,7 +255,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         if self.dynamic_decay=='linear':
             run = SMAC3v2Run.from_path(self.path_to_run)
             current_trial = len(run.trial_keys)
-            pos = np.floor(current_trial / (self.n_trials//7))
+            pos = int(np.floor(current_trial / (self.n_trials//7)))
             # thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
             self.thresh = self.thresh_list[pos]
         if self.hpi=='fanova':
