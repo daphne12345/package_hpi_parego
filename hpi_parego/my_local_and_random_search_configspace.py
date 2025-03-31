@@ -23,6 +23,8 @@ import random
 from itertools import combinations
 from collections import defaultdict
 import pickle as pckl
+from pathlib import Path
+from memory_profiler import profile
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -93,7 +95,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         )
         print('PATH', path_to_run)
 
-        self.path_to_run=path_to_run
+        self.path_to_run = Path(path_to_run) if isinstance(path_to_run,str) else path_to_run
         self._original_cs = copy.deepcopy(configspace)
         self.adjust_cs = adjust_cs # whether to adjust the configspace for sampling
         self.constant = constant # whether to set the unimportant hyperparameters to the cosntant default value or a distribution with very unlikely other values
@@ -198,6 +200,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
         important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
         # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
+        del run, df_res, fanova
         return important_hps
     
     def _random_selection(self):
@@ -223,27 +226,30 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         Returns:
             _type_: list of important hps
         """
-        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model)
-        # set up the computer
-        if hpo_game.n_players < 15:
-            computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
-            # mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
-            mi_values = computer.shapley_interaction(index="FSII", order=2)                     
-        else:
-            approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
-            mi_values = approximator.approximate(budget=100*hpo_game.n_players, game=hpo_game)
-        mi_values = dict(zip(mi_values.interaction_lookup, mi_values.values))
-        coas = self.sum_mi_values_higher(mi_values)
-        thresh = np.quantile(list(coas.values()), self.thresh) 
-        thresh = thresh if thresh > 0 else 0
-        coas = [(co, len(co[0])) for co in (coas.items()) if co[1]>thresh]
-        if len(coas)==0:
-            return []
-        min_coa = list(min(coas, key=lambda x: x[1])[0][0])
-        important_hps = [self._configspace.get_hyperparameter_names()[i] for i in min_coa]
-        return important_hps
+            
+        with HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model) as hpo_game:
+            print('n hps:', hpo_game.n_players)
+            if hpo_game.n_players <= 10:
+                computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
+                # mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
+                mi_values = computer.shapley_interaction(index="FSII", order=2)                     
+            else:
+                # approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
+                # mi_values = approximator.approximate(budget=10*hpo_game.n_players, game=hpo_game)
+                approximator = shapiq.PermutationSamplingSII(n=hpo_game.n_players, max_order=2)
+                mi_values = approximator.approximate(budget=10 * hpo_game.n_players, game=hpo_game)
+            mi_values = dict(zip(mi_values.interaction_lookup, mi_values.values))
+            coas = self.sum_mi_values_higher(mi_values)
+            thresh = np.quantile(list(coas.values()), self.thresh) 
+            thresh = max(thresh, 0)
+            coas = [(co, len(co[0])) for co in (coas.items()) if co[1]>thresh]
+            if len(coas)==0:
+                return []
+            min_coa = list(min(coas, key=lambda x: x[1])[0][0])
+            important_hps = [self._configspace.get_hyperparameter_names()[i] for i in min_coa]
+            return important_hps
        
-    
+    # @profile(stream=open("memory_profile.log", "w"))
     def _maximize(
         self,
         previous_configs: list[Configuration],
@@ -258,21 +264,22 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             pos = int(np.floor(current_trial / (self.n_trials//7)))
             # thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
             self.thresh = self.thresh_list[pos]
+            del run
         if self.hpi=='fanova':
-            if random.choice(range(0,100))<10:
+            if random.random() < 0.1:
                 important_hps = self._random_selection()
             else:
                 important_hps = self._calculate_hpi_fanova(previous_configs)
         elif self.hpi=='random':
             important_hps = self._random_selection()
         else:
-            if random.choice(range(0,100))<10:
+            if random.random() < 0.1:
                 important_hps = self._random_selection()
             else:
                 important_hps = self._calculate_hpi_hypershap(previous_configs)
-        self.important_hps.append(important_hps)
-        if len(self.important_hps)%10==0:
-            pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
+        # self.important_hps.append(important_hps)
+        # if len(self.important_hps)%50==0:
+        #     pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
         if len(important_hps) > 0:
             if self.adjust_cs:
                 self.adjust_configspace(important_hps)
@@ -330,12 +337,11 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             important_hps (_type_): list of important hyperpamaters
         """
         print('adjust configspace')
-        cs = copy.deepcopy(self._original_cs)
-        random_state = cs.random.get_state()
+        random_state = self._original_cs.random.get_state()
         new_cs = ConfigurationSpace()
         new_cs.random.set_state(random_state)
 
-        for hp in cs.values():
+        for hp in self._original_cs.values():
             if hp.name in important_hps:
                 try:
                     new_cs.add(hp)
@@ -385,7 +391,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 except:
                     new_cs.add_hyperparameter(new_hp)
         if not self.constant:
-            new_cs.add_conditions(cs.get_conditions())
+            new_cs.add_conditions(self._original_cs.get_conditions())
         
         self._configspace = new_cs
         self._local_search._configspace = new_cs
@@ -406,16 +412,19 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     
     def adjust_previous_configs(self, previous_configs, important_hps):
         hps_unimportant = list(set(self._original_cs.get_hyperparameter_names())-set(important_hps))
-        converted_configs = copy.copy(previous_configs)
+        converted_configs = list(previous_configs)
         if self.set_to_default:
             default = self._original_cs.get_default_configuration()
             for hp in hps_unimportant:
-                if hp in default:
-                    converted_configs = [self.update(cfg, hp, default) for cfg in converted_configs if hp in cfg]
+                if hp in default:                    
+                    for i, cfg in enumerate(converted_configs):
+                        if hp in cfg:
+                            converted_configs[i] = self.update(cfg, hp, default) 
         else: # random augmentation
             for _ in range(5):
                 random_cfgs = self._original_cs.sample_configuration(len(previous_configs))
                 for hp in important_hps:
-                    random_cfgs = [self.update(new_cfg, hp, old_cfg) for new_cfg, old_cfg in zip(random_cfgs, previous_configs)]
-                converted_configs += random_cfgs
+                    for i in range(len(random_cfgs)):
+                        random_cfgs[i] = self.update(random_cfgs[i], hp, previous_configs[i])
+            converted_configs.extend(random_cfgs)
         return converted_configs
