@@ -78,7 +78,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         constant=True,
         hpi_method='hypershap',
         adjust_previous_cfgs=False,
-        set_to_default=False,
+        set_to='default',
         thresh=0.5,
         dynamic_decay=None,
         adjust_cs_method=None,
@@ -101,7 +101,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.constant = constant # whether to set the unimportant hyperparameters to the cosntant default value or a distribution with very unlikely other values
         self.hpi=hpi_method # fanova or hypershap
         self.adjust_previous_cfgs = adjust_previous_cfgs # whther to adjust the previous configs for search
-        self.set_to_default = set_to_default # whether to adjust the previous configs by setting the unimportant hps to default or random augmentation
+        self.set_to = set_to # whether to adjust the previous configs by setting the unimportant hps to default or random augmentation
         self.thresh = thresh # threshold for quantile cut off for hpi
         self.dynamic_decay = dynamic_decay
         self.n_trials = n_trials
@@ -109,6 +109,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.thresh_list = thresh_list
         self.adjust_cs_method = adjust_cs_method
         self.cs_proba_hpi = cs_proba_hpi
+        self.incumbent = self._original_cs.sample_configuration()
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -264,6 +265,11 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
         logger.info(self.hpi)
+        if self.set_to=='incumbent' or self.adjust_cs_method=='incumbent':
+            X = convert_configurations_to_array(previous_configs)
+            Y,_ = self._acquisition_function._model.predict(X)
+            self.incumbent = previous_configs[np.argmin(Y)]
+
         if self.dynamic_decay=='linear':
             run = SMAC3v2Run.from_path(self.path_to_run)
             current_trial = len(run.trial_keys)
@@ -357,7 +363,12 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 except:
                     new_cs.add_hyperparameter(hp)
             else:
-                hp_value = hp.default_value if self.adjust_cs_method=='default' else hp.sample_value()
+                if self.adjust_cs_method=='default':
+                    hp_value = hp.default_value  
+                elif self.adjust_cs_method=='incumbent':
+                    hp_value = self.incumbent[hp.name]
+                else:
+                    hp_value = hp.sample_value()
                 if self.constant:
                     new_hp = Constant(
                         name=hp.name,
@@ -422,7 +433,12 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         new_cs.random.set_state(random_state)
 
         for hp in self._original_cs.values():
-            hp_value = hp.default_value if self.adjust_cs_method=='default' else hp.sample_value()
+            if self.adjust_cs_method=='default':
+                hp_value = hp.default_value  
+            elif self.adjust_cs_method=='incumbent':
+                hp_value = self.incumbent[hp.name]
+            else:
+                hp_value = hp.sample_value()
             if isinstance(hp, CategoricalHyperparameter):
                 new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
                 new_hp = CategoricalHyperparameter(
@@ -481,13 +497,13 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     def adjust_previous_configs(self, previous_configs, important_hps):
         hps_unimportant = list(set(self._original_cs.get_hyperparameter_names())-set(important_hps))
         converted_configs = list(previous_configs)
-        if self.set_to_default:
-            default = self._original_cs.get_default_configuration()
+        if self.set_to != 'random':
+            target_cfg = self._original_cs.get_default_configuration() if self.set_to=='default' else self.incumbent 
             for hp in hps_unimportant:
-                if hp in default:                    
+                if hp in target_cfg:                    
                     for i, cfg in enumerate(converted_configs):
                         if hp in cfg:
-                            converted_configs[i] = self.update(cfg, hp, default) 
+                            converted_configs[i] = self.update(cfg, hp, target_cfg) 
         else: # random augmentation
             for _ in range(5):
                 random_cfgs = self._original_cs.sample_configuration(len(previous_configs))
