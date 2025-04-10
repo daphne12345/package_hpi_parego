@@ -24,7 +24,6 @@ from itertools import combinations
 from collections import defaultdict
 import pickle as pckl
 from pathlib import Path
-from memory_profiler import profile
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -85,7 +84,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         adjust_cs_method=None,
         n_trials=100,
         thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3],
-        path_to_run=None
+        path_to_run=None,
+        cs_proba_hpi=False
     ) -> None:
         super().__init__(
             configspace,
@@ -108,6 +108,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.important_hps = []
         self.thresh_list = thresh_list
         self.adjust_cs_method = adjust_cs_method
+        self.cs_proba_hpi = cs_proba_hpi
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -200,13 +201,17 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
         important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
         # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
+        hpis = df_res.set_index('index')[0].to_dict()
         del run, df_res, fanova
-        return important_hps
+        return important_hps, hpis
     
     def _random_selection(self):
         hps = self._configspace.get_hyperparameter_names()
         n_hps =  int(np.round((1 - self.thresh) * len(hps)))
-        return random.sample(hps, n_hps)
+        hpis = [random.random() for i in range(len(hps))]
+        hpis = np.array(hpis)/sum(hpis)
+        hpis = dict(zip(hps, hpis))
+        return random.sample(hps, n_hps), hpis
     
     def sum_mi_values_higher(self, values):
         result = defaultdict(float, values)
@@ -268,14 +273,14 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             del run
         if self.hpi=='fanova':
             if random.random() < 0.1:
-                important_hps = self._random_selection()
+                important_hps, hpis = self._random_selection()
             else:
-                important_hps = self._calculate_hpi_fanova(previous_configs)
+                important_hps, hpis = self._calculate_hpi_fanova(previous_configs)
         elif self.hpi=='random':
-            important_hps = self._random_selection()
+            important_hps, hpis = self._random_selection()
         else:
             if random.random() < 0.1:
-                important_hps = self._random_selection()
+                important_hps, _ = self._random_selection()
             else:
                 important_hps = self._calculate_hpi_hypershap(previous_configs)
         # self.important_hps.append(important_hps)
@@ -283,7 +288,10 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         #     pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
         if len(important_hps) > 0:
             if self.adjust_cs:
-                self.adjust_configspace(important_hps)
+                if self.cs_proba_hpi:
+                    self.adjust_cs_hpi(hpis)
+                else:
+                    self.adjust_configspace(important_hps)
             if self.adjust_previous_cfgs:
                 previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
 
@@ -391,6 +399,65 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                     new_cs.add(new_hp)
                 except:
                     new_cs.add_hyperparameter(new_hp)
+        if not self.constant:
+            new_cs.add_conditions(self._original_cs.get_conditions())
+        
+        self._configspace = new_cs
+        self._local_search._configspace = new_cs
+        if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
+            self._prior_random_search._configspace = new_cs
+            self._uniform_random_search._configspace = new_cs
+        else:  
+            self._random_search._configspace = new_cs
+    
+    def adjust_cs_hpi(self, hpis):
+        """Sets all unimportant hyperparameters in all configspaces of local and random search to be very unlikely.
+
+        Args:
+            important_hps (_type_): list of important hyperpamaters
+        """
+        print('adjust configspace')
+        random_state = self._original_cs.random.get_state()
+        new_cs = ConfigurationSpace()
+        new_cs.random.set_state(random_state)
+
+        for hp in self._original_cs.values():
+            hp_value = hp.default_value if self.adjust_cs_method=='default' else hp.sample_value()
+            if isinstance(hp, CategoricalHyperparameter):
+                new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
+                new_hp = CategoricalHyperparameter(
+                    name=hp.name,
+                    choices=hp.choices,
+                    default_value=hp_value,
+                    weights=new_weights,
+                )
+            elif isinstance(hp, (UniformFloatHyperparameter, NormalFloatHyperparameter)):
+                new_hp = NormalFloatHyperparameter(
+                    name=hp.name,
+                    lower=hp.lower,
+                    upper=hp.upper,
+                    mu=hp_value,
+                    sigma=hpis[hp.name],
+                    log=hp.log,
+                )
+            elif isinstance(hp, UniformIntegerHyperparameter):                
+                new_hp = NormalIntegerHyperparameter(
+                    name=hp.name,
+                    lower=hp.lower,
+                    upper=hp.upper,
+                    mu=hp_value,
+                    sigma=hpis[hp.name],
+                    log=hp.log,
+                )
+                
+            else:
+                new_hp = hp
+                print(f"Hyperparameter {hp} not supported. Using old hp values.")
+
+            try:
+                new_cs.add(new_hp)
+            except:
+                new_cs.add_hyperparameter(new_hp)
         if not self.constant:
             new_cs.add_conditions(self._original_cs.get_conditions())
         

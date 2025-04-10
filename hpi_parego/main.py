@@ -26,7 +26,6 @@ __license__ = "3-clause BSD"
 
 from hpi_parego.my_config_selector import MyConfigSelector
 from hpi_parego.my_ei_hpi import MyEI
-from hpi_parego.my_runhistroy_encoder import MyRunHistoryEncoder
 from hpi_parego.my_local_and_random_search_configspace import MyLocalAndSortedRandomSearchConfigSpace
 import random 
 
@@ -110,8 +109,8 @@ if __name__ == "__main__":
 
     my_acquisition_function = MyEI()
     my_config_selector = MyConfigSelector(scenario)
-    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, adjust_cs=True, constant=False, hpi_method='fanova',
-        adjust_previous_cfgs=False, adjust_cs_method='random', set_to_default=False)
+    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, adjust_cs=True, constant=False, hpi_method='random',
+        adjust_previous_cfgs=False, adjust_cs_method='random', set_to_default=False, cs_proba_hpi=True)
     
 
     # Create our SMAC object and pass the scenario and the train method

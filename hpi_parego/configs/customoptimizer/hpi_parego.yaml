@@ -20,6 +20,7 @@ optimizer:
         dynamic_decay: linear # or linear 
         adjust_cs_method: default # or random
         thresh_list: [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
+        cs_proba_hpi: false
         n_trials: ${optimizer.smac_cfg.scenario.n_trials}   
       acquisition_function:
         _target_: hpi_parego.my_ei_hpi.MyEI
