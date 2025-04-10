@@ -1,0 +1,55 @@
+# @package _global_
+defaults:
+  - hydra/launcher: submitit_slurm
+optimizer_id: HPI-ParEGO-50-quantile
+optimizer_container_id: SMAC3
+optimizer:
+  smac_cfg:
+    scenario:
+      output_directory: ${outdir}
+      name: smac3output
+      n_trials: 100  # Example number of trials, adjust accordingly
+    smac_kwargs:
+      acquisition_maximizer:
+        _target_: hpi_parego.my_local_and_random_search_configspace.MyLocalAndSortedRandomSearchConfigSpace
+        _partial_: true
+        path_to_run: ${optimizer.smac_cfg.scenario.output_directory}/${optimizer.smac_cfg.scenario.name}/${optimizer.smac_cfg.scenario.seed}
+        adjust_cs: true
+        hpi_method: ${hpi_method}  # This will be swept over
+        constant: ${constant}      # This will be swept over
+        adjust_previous_cfgs: ${adjust_previous_cfgs}  # This will be swept over
+        set_to_default: ${set_to_default}  # This will be swept over
+        thresh: ${thresh}  # This will be swept over
+        dynamic_decay: ${dynamic_decay}  # This will be swept over
+        adjust_cs_method: ${adjust_cs_method}  # This will be swept over
+        thresh_list: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]
+        n_trials: ${optimizer.smac_cfg.scenario.n_trials}
+      acquisition_function:
+        _target_: hpi_parego.my_ei_hpi.MyEI
+      config_selector:
+        _target_: hpi_parego.my_config_selector.MyConfigSelector
+        _partial_: true
+
+# Sweeping over hyperparameters
+hpi_method: [hypershap, fanova, random]
+adjust_cs: [true, false]
+adjust_previous_cfgs: [true, false]
+dynamic_decay: [linear, none]  # Options for decay
+
+
+# Conditional config
+conditional_configs:
+  adjust_cs_specific:
+    enabled: ${adjust_cs} == "true"
+    adjust_cs_method: [default, random]
+    constant: [true, false]
+  adjust_previous_specific:
+    enabled: ${adjust_previous_cfgs} == "true"
+    set_to_default: [true, false]
+  decay_specific:
+    enabled: ${dynamic_decay} == "linear"
+    thresh_list: [[0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3], [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]
+  no_decay_specific:
+    enabled: ${dynamic_decay} == "none"
+    thresh: [0.5,0.75]
+  
