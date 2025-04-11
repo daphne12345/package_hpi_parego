@@ -5,8 +5,8 @@
 
 #SBATCH --partition=ai
 #SBATCH --nodes=1
-#SBATCH --time=48:00:00
-#SBATCH --cpus-per-task=4
+#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=1
 #SBATCH --mem=64GB
 
 commit_hash=$(git log -1 --pretty=format:"%h")
@@ -43,8 +43,7 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run hydra.searchpath=[file:///bigwork/$USER/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego '+problem/YAHPO/MO=cfg_iaml_super_1489' 'seed=0'"
-#HYDRA_CMD="python -m carps.run hydra.searchpath=[file:///bigwork/$USER/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective +customoptimizer=hpi_parego '+problem/YAHPO/MO=glob(*)' 'seed=range(0,5)'"
+HYDRA_CMD="python -m carps.run hydra.searchpath=[file:///bigwork/$USER/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego '+task/subselection/multiobjective/dev=glob(*)' 'seed=range(0,5)'"
 
 # Add all Hydra overrides
 for override in "${HYDRA_OVERRIDES[@]}"; do
