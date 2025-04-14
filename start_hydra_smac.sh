@@ -43,7 +43,9 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run '+problem/YAHPO/MO=glob(*)' 'seed=range(0,5)'"
+HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,5)'"
+
+
 
 # Add all Hydra overrides
 for override in "${HYDRA_OVERRIDES[@]}"; do

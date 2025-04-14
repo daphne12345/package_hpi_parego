@@ -277,6 +277,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             # thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
             self.thresh = self.thresh_list[pos]
             del run
+        
+        hpis = []
         if self.hpi=='fanova':
             if random.random() < 0.1:
                 important_hps, hpis = self._random_selection()
