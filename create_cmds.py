@@ -144,7 +144,7 @@ for _, row in df.iterrows():
         baserundir += f"_thresh_{row['thresh']}"
         
     if row['thresh_list'] is not None:
-        command += f" 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi={row['thresh_list']}'"
+        command += f" 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list={row['thresh_list']}'"
         if row['thresh_list'] == '[0.9,0.8,0.7,0.6,0.5,0.4,0.3]': 
             baserundir += f"_down"
         elif row['thresh_list'] == '[0.3,0.4,0.5,0.6,0.7,0.8,0.9]':
