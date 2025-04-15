@@ -121,15 +121,15 @@ for _, row in df.iterrows():
     if row['constant'] is not None:
         command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant={row['constant']}"
         if row['constant'] == 'true':
-            baserundir += f"_{row['constant']}"
+            baserundir += f"_constant"
     if row['cs_proba_hpi'] is not None:
         command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi={row['cs_proba_hpi']}"
         if row['cs_proba_hpi'] == 'true':    
-            baserundir += f"_{row['cs_proba_hpi']}"
+            baserundir += f"_cs_proba_hpi"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs={row['adjust_previous_cfgs']}"
     if row['adjust_previous_cfgs'] == 'true': 
-        baserundir += f"_{row['adjust_previous_cfgs']}"
+        baserundir += f"_adjust_prev_cfgs"
     
     if row['set_to'] is not None:
         command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to={row['set_to']}"
