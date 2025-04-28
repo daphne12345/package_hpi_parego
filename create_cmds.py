@@ -3,7 +3,7 @@ from itertools import product
 import subprocess
 import time
 
-hpi_method = ['hypershap']#, 'fanova', 'random']
+hpi_method = ['hypershap', 'fanova', 'random']
 adjust_cs = ['true', 'false']
 adjust_previous_cfgs = ['true', 'false']
 dynamic_decay = ['linear', 'none']
@@ -16,56 +16,7 @@ set_to = ['random', 'default', 'incumbent']
 
 thresh_list = ['[0.9,0.8,0.7,0.6,0.5,0.4,0.3]', '[0.3,0.4,0.5,0.6,0.7,0.8,0.9]']
 thresh = [0.5, 0.75]
-# task = ['subset_hpobench_multiobjective_tabular_ml_lr_53',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_9952',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_9977',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_10101',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_146212',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_146606',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_146818',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_146821',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_146822',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_167119',
-# 'subset_hpobench_multiobjective_tabular_ml_lr_167120',
-# 'subset_hpobench_multiobjective_tabular_ml_nn_3917',
-# 'subset_hpobench_multiobjective_tabular_ml_nn_10101',
-# 'subset_hpobench_multiobjective_tabular_ml_nn_146821',
-# 'subset_hpobench_multiobjective_tabular_ml_rf_3',
-# 'subset_hpobench_multiobjective_tabular_ml_rf_9952',
-# 'subset_hpobench_multiobjective_tabular_ml_rf_146212',
-# 'subset_hpobench_multiobjective_tabular_ml_rf_167119',
-# 'subset_hpobench_multiobjective_tabular_ml_rf_167120',
-# 'subset_hpobench_multiobjective_tabular_ml_rf_168911',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_3',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_31',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_53',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_3917',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_9952',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_9977',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_14965',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_146822',
-# 'subset_hpobench_multiobjective_tabular_ml_svm_168911',
-# 'subset_hpobench_multiobjective_tabular_ml_xgboost_3917',
-# 'subset_hpobench_multiobjective_tabular_ml_xgboost_7592',
-# 'subset_hpobench_multiobjective_tabular_ml_xgboost_9952',
-# 'subset_hpobench_multiobjective_tabular_ml_xgboost_146606',
-# 'subset_hpobench_multiobjective_tabular_ml_xgboost_146822',
-# 'subset_hpobench_multiobjective_tabular_ml_xgboost_167120',
-task = ['subset_Pymoo_ManyO_unconstraint_dtlz1',
-'subset_Pymoo_ManyO_unconstraint_dtlz5',
-'subset_Pymoo_ManyO_unconstraint_dtlz6',
-'subset_Pymoo_ManyO_unconstraint_dtlz7',
-'subset_Pymoo_ManyO_unconstraint_wfg2_10_5',
-'subset_Pymoo_ManyO_unconstraint_wfg3_10_5',
-'subset_Pymoo_MO_unconstraint_kursawe',
-'subset_Pymoo_MO_unconstraint_zdt1',
-'subset_Pymoo_MO_unconstraint_zdt2',
-'subset_Pymoo_MO_unconstraint_zdt6',
-'subset_yahpo_mo_iaml_glmnet_1489_None',
-'subset_yahpo_mo_iaml_ranger_1489_None',
-'subset_yahpo_mo_rbv2_ranger_375_None',
-'subset_yahpo_mo_rbv2_xgboost_28_None',
-'subset_yahpo_mo_rbv2_xgboost_182_None']
+task = ['+task/subselection/multiobjective/dev=glob(*)', '+task/subselection/multiobjective/test=glob(*)']
 
 # Generate all combinations
 combinations = list(product(
@@ -103,12 +54,13 @@ df = df[~((df['cs_proba_hpi']=='true')&(df['hpi_method']=='hypershap'))]
 
 df = df.drop_duplicates()
 
+
 commands = []
 
 for _, row in df.iterrows():
     # Construct the command dynamically, skipping None values
-    command = "sbatch start_hydra.sh"
-    command += f" '+task/subselection/multiobjective/dev={row['task']}'"
+    command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:///home/daphne/Code/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
+    command += f" '{row['task']}'"
     baserundir = f"results/"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method={row['hpi_method']}"
@@ -116,7 +68,8 @@ for _, row in df.iterrows():
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs={row['adjust_cs']}"
     if row['adjust_cs'] == 'true':
-        baserundir += f"adjust_cs"
+        baserundir += f"adjust_cs_{row['adjust_cs_method']}"
+        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method={row['adjust_cs_method']}"
     
     if row['constant'] is not None:
         command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant={row['constant']}"
@@ -152,14 +105,19 @@ for _, row in df.iterrows():
         
         
     command += f" baserundir={baserundir}"
+    command += f" optimizer_id={row['hpi_method']}_{baserundir.split('/')[-1]}"
+    
+    command += " -m"
     
     commands.append(command)
 
-
-
+commands.reverse()
 for command in commands:
     process = subprocess.run(command, shell=True)
+   
     if process.returncode != 0:
         print(f"Command failed: {command}")
-    time.sleep(3)
+    # time.sleep(3)
+print('command length', len(commands))
+print('all commands executed')
 exit()
