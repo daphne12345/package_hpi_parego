@@ -17,6 +17,20 @@ class fANOVAWeighted(fANOVA):
         super().__init__(run)
         self.n_trees = 10
 
+    def normalize_Y(self, Y):
+        Y = Y.flatten()  # Ensure it's 1D
+
+        Y_min = np.min(Y)
+        Y_max = np.max(Y)
+
+        if Y_max == Y_min:
+            # Avoid division by zero: return all 1s (or a small constant)
+            return np.ones_like(Y)
+
+        Y_norm = (Y - Y_min) / (Y_max - Y_min)  # Normalize to [0, 1]
+        Y_norm = Y_norm * (1 - 1e-8) + 1e-8     # Scale to [1e-8, 1]
+        return Y_norm
+
     def train_model(
             self,
             X, Y
@@ -35,5 +49,13 @@ class fANOVAWeighted(fANOVA):
 
             # Convert only integer-like columns back to int
             X[:, int_rows] = X[:, int_rows].astype(int)
-        self._model = FanovaForest(self.cs, n_trees=self.n_trees, seed=0)
-        self._model.train(X, Y)
+        self._model = FanovaForest(self.cs, n_trees=self.n_trees, seed=0, cutoffs=(-10,10))
+        
+        try:
+            self._model.train(X, Y)
+        except RuntimeError as e:
+            print("Normalizing Y")
+            Y = self.normalize_Y(Y)
+            self._model.train(X, Y)
+        
+        

@@ -93,3 +93,5 @@ sbatch start_hydra_smac.sh +optimizer/optuna=multiobjective baserundir=results/o
 
 
 
+
+

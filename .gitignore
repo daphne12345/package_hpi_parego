@@ -15,3 +15,6 @@ runs/*
 *.conda
 results/*
 *.jsonl
+hydra_launcher_*
+logs/*
+multirun/*

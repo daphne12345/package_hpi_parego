@@ -213,15 +213,29 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         hpis = np.array(hpis)/sum(hpis)
         hpis = dict(zip(hps, hpis))
         return random.sample(hps, n_hps), hpis
+
     
     def sum_mi_values_higher(self, values):
-        result = defaultdict(float, values)
-        indices = sorted({i for key in values for i in key})
+        frozen_values = {frozenset(k): v for k, v in values.items()}
+        result = defaultdict(float, frozen_values)
+
+        indices = sorted({i for k in frozen_values for i in k})
+        size_to_keys = defaultdict(list)
+        for k in frozen_values:
+            size_to_keys[len(k)].append(k)
 
         for size in range(2, len(indices) + 1):
             for comb in combinations(indices, size):
-                result[comb] = sum(values[key] for key in values if set(key).issubset(comb))
-        return dict(result)
+                cset = frozenset(comb)
+                result[cset] = sum(
+                    frozen_values[k] for l in range(1, size)
+                    for k in size_to_keys[l] if k.issubset(cset)
+                )
+
+        return {tuple(sorted(k)): v for k, v in result.items()}
+    
+    
+    
     
     def _calculate_hpi_hypershap(self, previous_configs):
         """Calcuulates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
@@ -264,7 +278,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     ) -> list[tuple[float, Configuration]]:
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
-        logger.info(self.hpi)
+        print(self.hpi, self.set_to, self.adjust_cs_method)
         if self.set_to=='incumbent' or self.adjust_cs_method=='incumbent':
             X = convert_configurations_to_array(previous_configs)
             Y,_ = self._acquisition_function._model.predict(X)
@@ -273,8 +287,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         if self.dynamic_decay=='linear':
             run = SMAC3v2Run.from_path(self.path_to_run)
             current_trial = len(run.trial_keys)
-            pos = int(np.floor(current_trial / (self.n_trials//7)))
-            # thresh_list = [0.9,0.8,0.7,0.6,0.5,0.4,0.3]
+            pos = min(current_trial // (self.n_trials // len(self.thresh_list)), len(self.thresh_list) - 1)
             self.thresh = self.thresh_list[pos]
             del run
         
@@ -368,7 +381,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 if self.adjust_cs_method=='default':
                     hp_value = hp.default_value  
                 elif self.adjust_cs_method=='incumbent':
-                    hp_value = self.incumbent[hp.name]
+                    hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
+
                 else:
                     hp_value = hp.sample_value()
                 if self.constant:
@@ -438,7 +452,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             if self.adjust_cs_method=='default':
                 hp_value = hp.default_value  
             elif self.adjust_cs_method=='incumbent':
-                hp_value = self.incumbent[hp.name]
+                hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
             else:
                 hp_value = hp.sample_value()
             if isinstance(hp, CategoricalHyperparameter):
