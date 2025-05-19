@@ -200,7 +200,10 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         fanova = fANOVAWeighted(run)
         fanova.train_model(X, Y)
         df_res = pd.DataFrame(fanova.get_importances(hp_names=None)).loc[0:1].T.reset_index()
-        important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
+        if self.thresh > 0:
+            important_hps = df_res[df_res[0] > df_res[0].quantile(self.thresh)]['index'].to_list()  # select hps over the 50% quantile of importance
+        else:
+            important_hps = df_res['index'].to_list() 
         # hps = df_res.sort_values(by=0, ascending=False).head(df_res.shape[0]//2)['index'].to_list()  # select better half of hps
         hpis = df_res.set_index('index')[0].to_dict()
         del run, df_res, fanova
@@ -253,16 +256,21 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
             # mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
             mi_values = computer.shapley_interaction(index="FSII", order=2)                     
-        else:
+        elif hpo_game.n_players <= 25:
             # approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
             # mi_values = approximator.approximate(budget=10*hpo_game.n_players, game=hpo_game)
             approximator = shapiq.PermutationSamplingSII(n=hpo_game.n_players, max_order=2)
             mi_values = approximator.approximate(budget=10 * hpo_game.n_players, game=hpo_game)
+        else:
+            approximator = shapiq.PermutationSamplingSII(n=hpo_game.n_players, max_order=2)
+            mi_values = approximator.approximate(budget=hpo_game.n_players, game=hpo_game)
+            
         mi_values = dict(zip(mi_values.interaction_lookup, mi_values.values))
         coas = self.sum_mi_values_higher(mi_values)
         thresh = np.quantile(list(coas.values()), self.thresh) 
         thresh = max(thresh, 0)
-        coas = [(co, len(co[0])) for co in (coas.items()) if co[1]>thresh]
+        if thresh>0:
+            coas = [(co, len(co[0])) for co in (coas.items()) if co[1]>thresh]
         if len(coas)==0:
             return []
         min_coa = list(min(coas, key=lambda x: x[1])[0][0])
@@ -276,6 +284,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         previous_configs: list[Configuration],
         n_points: int,
     ) -> list[tuple[float, Configuration]]:
+        
+        actual_previous_configs = previous_configs.copy()
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
         print(self.hpi, self.set_to, self.adjust_cs_method)
@@ -291,30 +301,32 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             self.thresh = self.thresh_list[pos]
             del run
         
-        hpis = []
-        if self.hpi=='fanova':
-            if random.random() < 0.1:
+        if self.thresh>0:
+        
+            hpis = []
+            if self.hpi=='fanova':
+                if random.random() < 0.1:
+                    important_hps, hpis = self._random_selection()
+                else:
+                    important_hps, hpis = self._calculate_hpi_fanova(previous_configs)
+            elif self.hpi=='random':
                 important_hps, hpis = self._random_selection()
             else:
-                important_hps, hpis = self._calculate_hpi_fanova(previous_configs)
-        elif self.hpi=='random':
-            important_hps, hpis = self._random_selection()
-        else:
-            if random.random() < 0.1:
-                important_hps, _ = self._random_selection()
-            else:
-                important_hps = self._calculate_hpi_hypershap(previous_configs)
-        # self.important_hps.append(important_hps)
-        # if len(self.important_hps)%50==0:
-        #     pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
-        if len(important_hps) > 0:
-            if self.adjust_cs:
-                if self.cs_proba_hpi:
-                    self.adjust_cs_hpi(hpis)
+                if random.random() < 0.1:
+                    important_hps, _ = self._random_selection()
                 else:
-                    self.adjust_configspace(important_hps)
-            if self.adjust_previous_cfgs:
-                previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
+                    important_hps = self._calculate_hpi_hypershap(previous_configs)
+            # self.important_hps.append(important_hps)
+            # if len(self.important_hps)%50==0:
+            #     pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
+            if len(important_hps) > 0:
+                if self.adjust_cs:
+                    if self.cs_proba_hpi:
+                        self.adjust_cs_hpi(hpis)
+                    else:
+                        self.adjust_configspace(important_hps)
+                if self.adjust_previous_cfgs:
+                    previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
             # Get configurations sorted by acquisition function value
@@ -350,12 +362,26 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             n_points=self._local_search_iterations,
             additional_start_points=random_starting_points,
         )
+        
+        # Check if configs are new
+        print('actual previous configs', actual_previous_configs)
+        new_cfgs = all([cfg not in actual_previous_configs for i, (acq_value, cfg) in enumerate(next_configs_by_local_search)])
+
+        if not new_cfgs:
+            self._configspace = self._original_cs
+            logger.info("No new configurations found. Falling back to original search space.")
+            next_configs_by_local_search = self._local_search._maximize(
+                previous_configs=actual_previous_configs,
+                n_points=self._local_search_iterations,
+                additional_start_points=random_starting_points,
+            )
+                   
 
         next_configs_by_acq_value = next_configs_by_local_search
         next_configs_by_acq_value.sort(reverse=True, key=lambda x: x[0])
         first_five = [f"{_[0]} ({_[1].origin})" for _ in next_configs_by_acq_value[:5]]
 
-        logger.debug(f"First 5 acquisition function values of selected configurations: \n{', '.join(first_five)}")
+        logger.info(f"First 5 acquisition function values of selected configurations: \n{', '.join(first_five)}")
 
         return next_configs_by_acq_value
     
