@@ -32,7 +32,7 @@ def check_existance_by_keys(experiment_definition: dict, existing_rows: list, id
 
 
 
-folder_path = Path("/scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/find_opt")
+folder_path = Path("pckl_configs")
 pkl_files = list(folder_path.glob("*.pkl"))
 print('length of pkl_files', len(pkl_files))
 
@@ -44,9 +44,9 @@ with ThreadPoolExecutor() as executor:
     exp_defs = list(executor.map(load_pickle, pkl_files))
 
 
-# CONNEC TO DATABASE and get existing experiments
-experiment_configuration_file_path = "/scratch/hpc-prf-intexml/daphne/hpi_parego/CARP-S/carps/experimenter/py_experimenter copy.yaml"
-database_credential_file_path = "/scratch/hpc-prf-intexml/daphne/hpi_parego/CARP-S/carps/experimenter/credentials.yaml"
+# CONNECT TO DATABASE and get existing experiments
+experiment_configuration_file_path = "carps/experimenter/py_experimenter copy.yaml"
+database_credential_file_path = "carps/experimenter/credentials.yaml"
 
 experimenter = PyExperimenter(
     experiment_configuration_file_path=experiment_configuration_file_path,
@@ -57,34 +57,29 @@ experimenter = PyExperimenter(
     use_codecarbon=False
 )
 
-try:
-    column_names = list(experimenter.db_connector.database_configuration.keyfields.keys())
-    existing_rows = experimenter.db_connector._get_existing_rows(column_names)
 
-    # Check if experiments exists
-    print("Checking if experiments already exist...")
-    rows_exist = [
-        check_existance_by_keys(exp_def, existing_rows, experiment_identifiers)
-        for exp_def in tqdm(exp_defs, total=len(exp_defs))
-    ]
-    
-    
-    print(f"This number of experiments already exists: {np.sum(rows_exist)}")
+column_names = list(experimenter.db_connector.database_configuration.keyfields.keys())
+existing_rows = experimenter.db_connector._get_existing_rows(column_names)
 
-    experiments_to_add = [exp_def for exp_def, exists in zip(exp_defs, rows_exist, strict=True) if not exists]
-    print(
-        f"number of existing rows {len(existing_rows)}, previous length: "
-        f"{len(exp_defs)}, length now {len(experiments_to_add)}"
-    )
-    
-    
-    BATCH_SIZE = 5000
-    for i in range(0, len(experiments_to_add), BATCH_SIZE):
-        batch = experiments_to_add[i:i+BATCH_SIZE]
-        experimenter.fill_table_with_rows(batch)
-except Exception as e:
-    # BATCH_SIZE = 1000
-    # for i in range(0, len(exp_defs), BATCH_SIZE):
-    #     batch = exp_defs[i:i+BATCH_SIZE]
-    #     experimenter.fill_table_with_rows(batch)
-    raise e
+# Check if experiments exists
+print("Checking if experiments already exist...")
+rows_exist = [
+    check_existance_by_keys(exp_def, existing_rows, experiment_identifiers)
+    for exp_def in tqdm(exp_defs, total=len(exp_defs))
+]
+
+
+print(f"This number of experiments already exists: {np.sum(rows_exist)}")
+
+experiments_to_add = [exp_def for exp_def, exists in zip(exp_defs, rows_exist, strict=True) if not exists]
+print(
+    f"number of existing rows {len(existing_rows)}, previous length: "
+    f"{len(exp_defs)}, length now {len(experiments_to_add)}"
+)
+
+
+BATCH_SIZE = 5000
+for i in range(0, len(experiments_to_add), BATCH_SIZE):
+    batch = experiments_to_add[i:i+BATCH_SIZE]
+    experimenter.fill_table_with_rows(batch)
+
