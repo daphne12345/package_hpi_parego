@@ -18,3 +18,8 @@ results/*
 hydra_launcher_*
 logs/*
 multirun/*
+figure_dir/*
+figures/*
+*.log
+*.csv
+*.pkl
