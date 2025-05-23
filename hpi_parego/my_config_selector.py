@@ -21,7 +21,7 @@ from smac.runhistory.runhistory import RunHistory
 from smac.scenario import Scenario
 from smac.utils.logging import get_logger
 
-__copyright__ = "Copyright 2022, automl.org"
+__copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
 
 
@@ -50,7 +50,7 @@ class MyConfigSelector:
         scenario: Scenario,
         *,
         retrain_after: int = 8,
-        retries: int = 16,
+        retries: int = 30,
         min_trials: int = 1,
     ) -> None:
         # Those are the configs sampled from the passed initial design
@@ -218,7 +218,6 @@ class MyConfigSelector:
             # Now we maximize the acquisition function
             challengers = self._acquisition_maximizer.maximize(
                 previous_configs,
-                n_points=self._retrain_after,
                 random_design=self._random_design,
             )
 

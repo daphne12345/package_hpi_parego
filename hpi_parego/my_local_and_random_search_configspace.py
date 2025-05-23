@@ -74,16 +74,12 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         seed: int = 0,
         uniform_configspace: ConfigurationSpace | None = None,
         prior_sampling_fraction: float | None = None,
-        adjust_cs=True,
-        constant=True,
-        hpi_method='hypershap',
-        adjust_previous_cfgs=False,
+        adjust_cs='default',
+        hpi_method='fanova',
+        adjust_previous_cfgs='no',
         set_to='default',
         thresh=0.5,
-        dynamic_decay=None,
-        adjust_cs_method=None,
         n_trials=100,
-        thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3],
         path_to_run=None,
         cs_proba_hpi=False
     ) -> None:
@@ -97,19 +93,16 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
 
         self.path_to_run = Path(path_to_run) if isinstance(path_to_run,str) else path_to_run
         self._original_cs = copy.deepcopy(configspace)
-        self.adjust_cs = adjust_cs # whether to adjust the configspace for sampling
-        self.constant = constant # whether to set the unimportant hyperparameters to the cosntant default value or a distribution with very unlikely other values
+        self.adjust_cs = adjust_cs # whether to adjust the configspace for sampling ('default', 'random', 'incumbent', 'no')
         self.hpi=hpi_method # fanova or hypershap
-        self.adjust_previous_cfgs = adjust_previous_cfgs # whther to adjust the previous configs for search
+        self.adjust_previous_cfgs = adjust_previous_cfgs # whther to adjust the previous configs for search ('true_no_retrain', 'no', 'true_retrain')
         self.set_to = set_to # whether to adjust the previous configs by setting the unimportant hps to default or random augmentation
-        self.thresh = thresh # threshold for quantile cut off for hpi
-        self.dynamic_decay = dynamic_decay
+        self.thresh = thresh # threshold or threshlist for quantile cut off for hpi
         self.n_trials = n_trials
         self.important_hps = []
-        self.thresh_list = thresh_list
-        self.adjust_cs_method = adjust_cs_method
         self.cs_proba_hpi = cs_proba_hpi
         self.incumbent = self._original_cs.sample_configuration()
+        self.thresh_list = eval(self.thresh) if not isinstance(self.thresh, float) else None
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -193,7 +186,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             _type_: list of important hps
         """
         X = convert_configurations_to_array(configs)
-        Y,_ = self._acquisition_function._model.predict(X)
+        Y = self._acquisition_function.model.predict_marginalized(X)[0]
 
         print('Path', self.path_to_run)
         run = SMAC3v2Run.from_path(self.path_to_run)
@@ -288,13 +281,14 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         actual_previous_configs = previous_configs.copy()
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
-        print(self.hpi, self.set_to, self.adjust_cs_method)
-        if self.set_to=='incumbent' or self.adjust_cs_method=='incumbent':
+        print(self.hpi, self.set_to, self.adjust_cs)
+        if self.set_to=='incumbent' or self.adjust_cs=='incumbent' or self.adjust_previous_cfgs=='true_retrain':
             X = convert_configurations_to_array(previous_configs)
-            Y,_ = self._acquisition_function._model.predict(X)
+            # Y,_ = self._acquisition_function._model.predict(X)
+            Y = self._acquisition_function.model.predict_marginalized(X)[0]
             self.incumbent = previous_configs[np.argmin(Y)]
 
-        if self.dynamic_decay=='linear':
+        if self.thresh_list:
             run = SMAC3v2Run.from_path(self.path_to_run)
             current_trial = len(run.trial_keys)
             pos = min(current_trial // (self.n_trials // len(self.thresh_list)), len(self.thresh_list) - 1)
@@ -316,17 +310,21 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                     important_hps, _ = self._random_selection()
                 else:
                     important_hps = self._calculate_hpi_hypershap(previous_configs)
-            # self.important_hps.append(important_hps)
-            # if len(self.important_hps)%50==0:
-            #     pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
+            self.important_hps.append(important_hps)
+            pckl.dump(self.important_hps, open(self.path_to_run / 'important_hps.pckl', 'wb'))
+            
             if len(important_hps) > 0:
-                if self.adjust_cs:
+                if self.adjust_cs!='no':
                     if self.cs_proba_hpi:
                         self.adjust_cs_hpi(hpis)
                     else:
                         self.adjust_configspace(important_hps)
-                if self.adjust_previous_cfgs:
+                if self.adjust_previous_cfgs!='no':
                     previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
+                    if self.adjust_previous_cfgs=='true_retrain':
+                        X = convert_configurations_to_array(previous_configs)
+                        Y = ?
+                        self._acquisition_function.model._train(X, Y)
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
             # Get configurations sorted by acquisition function value
@@ -381,7 +379,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         next_configs_by_acq_value.sort(reverse=True, key=lambda x: x[0])
         first_five = [f"{_[0]} ({_[1].origin})" for _ in next_configs_by_acq_value[:5]]
 
-        logger.info(f"First 5 acquisition function values of selected configurations: \n{', '.join(first_five)}")
+        logger.debug(f"First 5 acquisition function values of selected configurations: \n{', '.join(first_five)}")
 
         return next_configs_by_acq_value
     
@@ -404,56 +402,56 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 except:
                     new_cs.add_hyperparameter(hp)
             else:
-                if self.adjust_cs_method=='default':
+                if self.adjust_cs=='default':
                     hp_value = hp.default_value  
-                elif self.adjust_cs_method=='incumbent':
+                elif self.adjust_cs=='incumbent':
                     hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
 
                 else:
                     hp_value = hp.sample_value()
-                if self.constant:
-                    new_hp = Constant(
+                # if self.constant:
+                #     new_hp = Constant(
+                #         name=hp.name,
+                #         value=hp_value
+                #     )
+                # else: #distribution
+                if isinstance(hp, CategoricalHyperparameter):
+                    new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
+                    new_hp = CategoricalHyperparameter(
                         name=hp.name,
-                        value=hp_value
+                        choices=hp.choices,
+                        default_value=hp_value,
+                        weights=new_weights,
                     )
-                else: #distribution
-                    if isinstance(hp, CategoricalHyperparameter):
-                        new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
-                        new_hp = CategoricalHyperparameter(
-                            name=hp.name,
-                            choices=hp.choices,
-                            default_value=hp_value,
-                            weights=new_weights,
-                        )
-                    elif isinstance(hp, (UniformFloatHyperparameter, NormalFloatHyperparameter)):
-                        new_hp = NormalFloatHyperparameter(
-                            name=hp.name,
-                            lower=hp.lower,
-                            upper=hp.upper,
-                            mu=hp_value,
-                            sigma=(hp.upper - hp.lower)/10000000000,
-                            log=hp.log,
-                        )
-                    elif isinstance(hp, UniformIntegerHyperparameter):                
-                        new_hp = NormalIntegerHyperparameter(
-                            name=hp.name,
-                            lower=hp.lower,
-                            upper=hp.upper,
-                            mu=hp_value,
-                            sigma=(hp.upper - hp.lower)/10000000000,
-                            log=hp.log,
-                        )
-                        
-                    else:
-                        new_hp = hp
-                        print(f"Hyperparameter {hp} not supported. Using old hp values.")
+                elif isinstance(hp, (UniformFloatHyperparameter, NormalFloatHyperparameter)):
+                    new_hp = NormalFloatHyperparameter(
+                        name=hp.name,
+                        lower=hp.lower,
+                        upper=hp.upper,
+                        mu=hp_value,
+                        sigma=(hp.upper - hp.lower)/10000000000,
+                        log=hp.log,
+                    )
+                elif isinstance(hp, UniformIntegerHyperparameter):                
+                    new_hp = NormalIntegerHyperparameter(
+                        name=hp.name,
+                        lower=hp.lower,
+                        upper=hp.upper,
+                        mu=hp_value,
+                        sigma=(hp.upper - hp.lower)/10000000000,
+                        log=hp.log,
+                    )
+                    
+                else:
+                    new_hp = hp
+                    print(f"Hyperparameter {hp} not supported. Using old hp values.")
 
                 try:
                     new_cs.add(new_hp)
                 except:
                     new_cs.add_hyperparameter(new_hp)
-        if not self.constant:
-            new_cs.add_conditions(self._original_cs.get_conditions())
+        # if not self.constant:
+        new_cs.add_conditions(self._original_cs.get_conditions())
         
         self._configspace = new_cs
         self._local_search._configspace = new_cs
@@ -475,9 +473,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         new_cs.random.set_state(random_state)
 
         for hp in self._original_cs.values():
-            if self.adjust_cs_method=='default':
+            if self.adjust_cs=='default':
                 hp_value = hp.default_value  
-            elif self.adjust_cs_method=='incumbent':
+            elif self.adjust_cs=='incumbent':
                 hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
             else:
                 hp_value = hp.sample_value()
@@ -516,8 +514,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 new_cs.add(new_hp)
             except:
                 new_cs.add_hyperparameter(new_hp)
-        if not self.constant:
-            new_cs.add_conditions(self._original_cs.get_conditions())
+        new_cs.add_conditions(self._original_cs.get_conditions())
         
         self._configspace = new_cs
         self._local_search._configspace = new_cs
