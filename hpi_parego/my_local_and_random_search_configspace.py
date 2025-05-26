@@ -5,7 +5,9 @@ from typing import Any
 from ConfigSpace import Configuration, ConfigurationSpace, CategoricalHyperparameter, UniformFloatHyperparameter, NormalFloatHyperparameter, UniformIntegerHyperparameter, NormalIntegerHyperparameter, Constant
 
 from smac.acquisition.function import AbstractAcquisitionFunction
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
+from smac.acquisition.maximizer.abstract_acquisition_maximizer import (
+    AbstractAcquisitionMaximizer,
+)
 from smac.acquisition.maximizer.local_search import LocalSearch
 from smac.acquisition.maximizer.random_search import RandomSearch
 from smac.utils.logging import get_logger
@@ -24,6 +26,7 @@ from itertools import combinations
 from collections import defaultdict
 import pickle as pckl
 from pathlib import Path
+import json
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -323,7 +326,13 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                     previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
                     if self.adjust_previous_cfgs=='true_retrain':
                         X = convert_configurations_to_array(previous_configs)
-                        Y = ?
+                        with (self.path_to_run / "runhistory.json").open() as json_file:
+                            all_data = json.load(json_file)
+                            costs = {data['config_id']: data['cost'] for data in all_data["data"]}
+                        Y = np.array(list(costs.values()))
+                        if self.set_to=='random':
+                            Y = np.array(list(Y)*5)
+                        
                         self._acquisition_function.model._train(X, Y)
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
