@@ -17,6 +17,7 @@ set_to = ['incumbent']
 # thresh = ['[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]', '[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]', '[0.0,0.2,0.4,0.6,0.8,0.0]', '[0.0,0.2,0.4,0.6,0.8]', '[0.0,0.75,0.75,0.75,0.0]', '[0.0,0.9,0.7,0.5,0.3,0.0]', 0.5, 0.75] 
 thresh = [('0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('1','[0.0,0.75,0.75,0.75,0.0]'), ('2','[0.0,0.9,0.7,0.5,0.3,0.0]')]
 
+task = ['subset_hpobench_multiobjective_tabular_ml_lr_53', 'subset_hpobench_multiobjective_tabular_ml_lr_9952', 'subset_hpobench_multiobjective_tabular_ml_lr_9977']
 
 
 # Generate all combinations
@@ -26,13 +27,14 @@ combinations = list(product(
     adjust_previous_cfgs,
     cs_proba_hpi,
     set_to,
-    thresh
+    thresh,
+    task
 ))
 
 columns = [
     'hpi_method', 'adjust_cs', 'adjust_previous_cfgs',
     'cs_proba_hpi', 'set_to',
-    'thresh'
+    'thresh','task'
 ]
 df = pd.DataFrame(combinations, columns=columns)
 
@@ -54,6 +56,7 @@ for _, row in df.iterrows():
     # Construct the command dynamically, skipping None values
     #command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
     command = "sbatch start_create_cmds.sh "
+    command += f" ''+task/subselection/multiobjective/dev={row['task']}''"
 
     baserundir = "results/"
     

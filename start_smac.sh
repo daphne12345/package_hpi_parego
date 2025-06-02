@@ -36,8 +36,8 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,3)'"
-
+HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=subset_hpobench_multiobjective_tabular_ml_lr_53' +optimizer/smac20=multiobjective_rf 'seed=1'"
+#'subset_hpobench_multiobjective_tabular_ml_lr_53', 'subset_hpobench_multiobjective_tabular_ml_lr_9952', 'subset_hpobench_multiobjective_tabular_ml_lr_9977'
 # Add all Hydra overrides
 for override in "${HYDRA_OVERRIDES[@]}"; do
     HYDRA_CMD+=" $override"

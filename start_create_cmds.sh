@@ -36,7 +36,7 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego 'seed=1' '+task/subselection/multiobjective/dev=glob(*)' "
+HYDRA_CMD="python -m carps.run hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego 'seed=1' "
 
 # Add all Hydra overrides
 for override in "${HYDRA_OVERRIDES[@]}"; do
