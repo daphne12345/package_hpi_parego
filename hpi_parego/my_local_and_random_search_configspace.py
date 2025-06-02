@@ -5,9 +5,7 @@ from typing import Any
 from ConfigSpace import Configuration, ConfigurationSpace, CategoricalHyperparameter, UniformFloatHyperparameter, NormalFloatHyperparameter, UniformIntegerHyperparameter, NormalIntegerHyperparameter, Constant
 
 from smac.acquisition.function import AbstractAcquisitionFunction
-from smac.acquisition.maximizer.abstract_acquisition_maximizer import (
-    AbstractAcquisitionMaximizer,
-)
+from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
 from smac.acquisition.maximizer.local_search import LocalSearch
 from smac.acquisition.maximizer.random_search import RandomSearch
 from smac.utils.logging import get_logger
@@ -105,7 +103,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.important_hps = []
         self.cs_proba_hpi = cs_proba_hpi
         self.incumbent = self._original_cs.sample_configuration()
-        self.thresh_list = eval(self.thresh) if not isinstance(self.thresh, float) else None
+        self.thresh_list = self.thresh if not isinstance(self.thresh, float) else None
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -328,6 +326,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                         X = convert_configurations_to_array(previous_configs)
                         with (self.path_to_run / "runhistory.json").open() as json_file:
                             all_data = json.load(json_file)
+                            print(all_data['data'])
                             costs = {data['config_id']: data['cost'] for data in all_data["data"]}
                         Y = np.array(list(costs.values()))
                         if self.set_to=='random':

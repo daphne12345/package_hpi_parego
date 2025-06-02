@@ -4,18 +4,18 @@ import subprocess
 import time
 
 hpi_method = ['fanova']
-adjust_cs = ['default', 'random', 'incumbent', 'no'] #TODO
-# dynamic_decay = ['linear', 'none'] #TODO
-
-# adjust_cs_method = [] #TODO
-# constant = ['true', 'false'] #TODO
+# adjust_cs = ['default', 'random', 'incumbent', 'no']
+adjust_cs = ['no']
 cs_proba_hpi = ['true', 'false']
 
-adjust_previous_cfgs = ['true_no_retrain', 'no', 'true_retrain'] # TODO
-set_to = ['random', 'default', 'incumbent']
+adjust_previous_cfgs = ['no', 'true_retrain'] 
+# adjust_previous_cfgs = ['true_no_retrain', 'no', 'true_retrain']
+# set_to = ['random', 'default', 'incumbent']
+set_to = ['incumbent']
 
-thresh = ['[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]', '[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]', '[0.0,0.2,0.4,0.6,0.8,0.0]', '[0.0,0.2,0.4,0.6,0.8]', '[0.0,0.75,0.75,0.75,0.0]', '[0.0,0.9,0.7,0.5,0.3,0.0]', 0.5, 0.75] #TODO
-task = ['+task/subselection/multiobjective/dev=glob(*)', '+task/subselection/multiobjective/test=glob(*)']
+
+# thresh = ['[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]', '[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]', '[0.0,0.2,0.4,0.6,0.8,0.0]', '[0.0,0.2,0.4,0.6,0.8]', '[0.0,0.75,0.75,0.75,0.0]', '[0.0,0.9,0.7,0.5,0.3,0.0]', 0.5, 0.75] 
+thresh = [('0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('1','[0.0,0.75,0.75,0.75,0.0]'), ('2','[0.0,0.9,0.7,0.5,0.3,0.0]')]
 
 
 
@@ -26,14 +26,13 @@ combinations = list(product(
     adjust_previous_cfgs,
     cs_proba_hpi,
     set_to,
-    thresh,
-    task
+    thresh
 ))
 
 columns = [
     'hpi_method', 'adjust_cs', 'adjust_previous_cfgs',
     'cs_proba_hpi', 'set_to',
-    'thresh','task'
+    'thresh'
 ]
 df = pd.DataFrame(combinations, columns=columns)
 
@@ -53,8 +52,9 @@ commands = []
 
 for _, row in df.iterrows():
     # Construct the command dynamically, skipping None values
-    command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
-    command += f" '+task/subselection/multiobjective/dev={row['task']}'"
+    #command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
+    command = "sbatch start_create_cmds.sh "
+
     baserundir = "results/"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method={row['hpi_method']}"
@@ -79,29 +79,27 @@ for _, row in df.iterrows():
         baserundir += f"_set_to_{row['set_to']}"
     
     if row['thresh'] is not None:
-        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh={row['thresh']}"
-        baserundir += f"_thresh_{row['thresh']}"
+        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh={row['thresh'][1]}"
+        baserundir += f"_thresh_{row['thresh'][0]}"
         
         
     command += f" baserundir={baserundir}"
     command += f" optimizer_id={row['hpi_method']}_{baserundir.split('/')[-1]}"
     
-    command += " -m"
-    
     commands.append(command)
 
 # commands.reverse()
-# for command in commands[20000:]:
-#     process = subprocess.run(command, shell=True)
+for command in commands:
+    process = subprocess.run(command, shell=True)
    
-#     if process.returncode != 0:
-#         print(f"Command failed: {command}")
-#     # time.sleep(3)
-print('command length', 5*len(commands))
-# print('all commands executed')
-# exit()
+    if process.returncode != 0:
+        print(f"Command failed: {command}")
+    time.sleep(1)
+print('command length', len(commands))
+print('all commands executed')
+exit()
 
-print(commands[0])
+print(len(commands))
 # import subprocess
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -138,101 +136,101 @@ print(commands[0])
 
 
 
-# best fanova auc: fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0.75
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.75' 
-baserundir=results/fanova/fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0.75 optimizer_id=fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0.75 -m
+# # best fanova auc: fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0.75
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.75' 
+# baserundir=results/fanova/fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0.75 optimizer_id=fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0.75 -m
 
-# best fanova final: fanova_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=true optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.5' 
-baserundir=results/fanova/fanova_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 optimizer_id=fanova_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 -m
+# # best fanova final: fanova_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=true optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.5' 
+# baserundir=results/fanova/fanova_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 optimizer_id=fanova_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 -m
 
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=true optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.5' 
-baserundir=results/random/random_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 optimizer_id=random_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 -m
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=true optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.5' 
+# baserundir=results/random/random_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 optimizer_id=random_adjust_cs_incumbent_cs_proba_hpi_thresh_0.5 -m
 
-# best hypershap auc: hypershap_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=hypershap optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3]' 
-baserundir=results/hypershap/hypershap_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down optimizer_id=hypershap_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down -m
+# # best hypershap auc: hypershap_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=hypershap optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3]' 
+# baserundir=results/hypershap/hypershap_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down optimizer_id=hypershap_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down -m
 
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3]' 
-baserundir=results/random/random_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down optimizer_id=random_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down -m
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0.9,0.8,0.7,0.6,0.5,0.4,0.3]' 
+# baserundir=results/random/random_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down optimizer_id=random_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_dynamic_decay_down -m
 
----
-# best hypershap final: hypershap_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=hypershap optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.75' 
-baserundir=results/hypershap/hypershap_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 optimizer_id=hypershap_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 -m
+# ---
+# # best hypershap final: hypershap_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=hypershap optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.75' 
+# baserundir=results/hypershap/hypershap_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 optimizer_id=hypershap_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 -m
 
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.75' 
-baserundir=results/random/random_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 optimizer_id=random_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 -m
-
-
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/test=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=none 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh=0.75' 
+# baserundir=results/random/random_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 optimizer_id=random_adjust_cs_random_adjust_prev_cfgs_set_to_random_thresh_0.75 -m
 
 
-#fanova even better?
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/dev=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0,0.8,0.6,0.4,0.2,0]' 
-baserundir=results/fanova/fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0_lin_0 optimizer_id=fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0_lin_0 -m
 
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/dev=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=true optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0,0.8,0.6,0.4,0.2,0]' 
-baserundir=results/fanova/fanova_adjust_cs_incumbent_cs_proba_hpi_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 optimizer_id=fanova_adjust_cs_incumbent_cs_proba_hpi_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 -m
 
-python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
-+optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/dev=glob(*)' 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
-optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
-'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0,0.8,0.6,0.4,0.2,0]' 
-baserundir=results/fanova/fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 optimizer_id=fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 -m
+# #fanova even better?
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/dev=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0,0.8,0.6,0.4,0.2,0]' 
+# baserundir=results/fanova/fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0_lin_0 optimizer_id=fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_incumbent_thresh_0_lin_0 -m
+
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/dev=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=incumbent optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=false 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=true optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0,0.8,0.6,0.4,0.2,0]' 
+# baserundir=results/fanova/fanova_adjust_cs_incumbent_cs_proba_hpi_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 optimizer_id=fanova_adjust_cs_incumbent_cs_proba_hpi_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 -m
+
+# python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] 
+# +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)' '+task/subselection/multiobjective/dev=glob(*)' 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method=fanova optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method=default optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.constant=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi=false optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs=true 
+# optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to=random optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.dynamic_decay=linear 
+# 'optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh_list=[0,0.8,0.6,0.4,0.2,0]' 
+# baserundir=results/fanova/fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 optimizer_id=fanova_adjust_cs_default_constant_adjust_prev_cfgs_set_to_random_thresh_0_lin_0 -m
