@@ -5,7 +5,7 @@ from typing import Any
 from ConfigSpace import Configuration, ConfigurationSpace, CategoricalHyperparameter, UniformFloatHyperparameter, NormalFloatHyperparameter, UniformIntegerHyperparameter, NormalIntegerHyperparameter, Constant
 
 from smac.acquisition.function import AbstractAcquisitionFunction
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
+from smac.acquisition.maximizer.abstract_acquisition_maximizer import AbstractAcquisitionMaximizer
 from smac.acquisition.maximizer.local_search import LocalSearch
 from smac.acquisition.maximizer.random_search import RandomSearch
 from smac.utils.logging import get_logger
@@ -329,10 +329,13 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                             print(all_data['data'])
                             costs = {data['config_id']: data['cost'] for data in all_data["data"]}
                         Y = np.array(list(costs.values()))
-                        if self.set_to=='random':
-                            Y = np.array(list(Y)*5)
+                        if self.set_to=='random': #random augmentation will be 6 times longer
+                            Y = np.array(list(Y)*6)
                         
-                        self._acquisition_function.model._train(X, Y)
+                        self._acquisition_function.model.train(X, Y)
+                        
+                        Y = self._acquisition_function.model.predict_marginalized(X)[0]
+                        self._acquisition_function.update({'eta': np.min(Y)})
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
             # Get configurations sorted by acquisition function value
@@ -557,5 +560,5 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 for hp in important_hps:
                     for i in range(len(random_cfgs)):
                         random_cfgs[i] = self.update(random_cfgs[i], hp, previous_configs[i])
-            converted_configs.extend(random_cfgs)
+                converted_configs.extend(random_cfgs)
         return converted_configs
