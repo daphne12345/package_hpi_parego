@@ -4,20 +4,23 @@ import subprocess
 import time
 
 hpi_method = ['fanova']
-# adjust_cs = ['default', 'random', 'incumbent', 'no']
-adjust_cs = ['no']
+adjust_cs = ['default', 'random', 'incumbent', 'no']
 cs_proba_hpi = ['true', 'false']
 
-adjust_previous_cfgs = ['no', 'true_retrain'] 
-# adjust_previous_cfgs = ['true_no_retrain', 'no', 'true_retrain']
-# set_to = ['random', 'default', 'incumbent']
-set_to = ['incumbent']
+adjust_previous_cfgs = ['no', 'true_retrain', 'true_no_retrain'] 
+set_to = ['random', 'default', 'incumbent']
 
 
-# thresh = ['[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]', '[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]', '[0.0,0.2,0.4,0.6,0.8,0.0]', '[0.0,0.2,0.4,0.6,0.8]', '[0.0,0.75,0.75,0.75,0.0]', '[0.0,0.9,0.7,0.5,0.3,0.0]', 0.5, 0.75] 
-thresh = [('0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('1','[0.0,0.75,0.75,0.75,0.0]'), ('2','[0.0,0.9,0.7,0.5,0.3,0.0]')]
+# thresh = [('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('0-075-0','[0.0,0.75,0.75,0.75,0.0]'), ('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('down-0','[0.9,0.7,0.5,0.3,0.0]'), ('0-down','[0.0,0.9,0.7,0.5,0.3]'), 
+#           ('0-down-0-fine','[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]'), ('075','0.75'), ('05','0.5'), ('cos','[0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220,0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220]')]
 
-task = ['subset_hpobench_multiobjective_tabular_ml_lr_53', 'subset_hpobench_multiobjective_tabular_ml_lr_9952', 'subset_hpobench_multiobjective_tabular_ml_lr_9977']
+thresh = [('cos','[0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220,0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220]')]
+
+# task = ['subset_yahpo_mo_iaml_glmnet_1489_None',
+# 'subset_yahpo_mo_iaml_ranger_1489_None',
+# 'subset_yahpo_mo_rbv2_ranger_375_None',
+# 'subset_yahpo_mo_rbv2_xgboost_28_None',
+# 'subset_yahpo_mo_rbv2_xgboost_182_None']
 
 
 # Generate all combinations
@@ -28,13 +31,13 @@ combinations = list(product(
     cs_proba_hpi,
     set_to,
     thresh,
-    task
+    # task
 ))
 
 columns = [
     'hpi_method', 'adjust_cs', 'adjust_previous_cfgs',
     'cs_proba_hpi', 'set_to',
-    'thresh','task'
+    'thresh'#,'task'
 ]
 df = pd.DataFrame(combinations, columns=columns)
 
@@ -43,8 +46,8 @@ def remove(row, li):
         row[col] = None
     return row
 
-df[df['adjust_cs']=='false'] = df[df['adjust_cs']=='false'].apply(lambda row: remove(row, ['cs_proba_hpi']), axis=1)
-df[(df['adjust_previous_cfgs']=='false')] = df[(df['adjust_previous_cfgs']=='false')].apply(lambda row: remove(row, ['set_to']), axis=1)
+df[df['adjust_cs']=='no'] = df[df['adjust_cs']=='no'].apply(lambda row: remove(row, ['cs_proba_hpi']), axis=1)
+df[(df['adjust_previous_cfgs']=='no')] = df[(df['adjust_previous_cfgs']=='no')].apply(lambda row: remove(row, ['set_to']), axis=1)
 # df = df[~((df['cs_proba_hpi']=='true')&(df['hpi_method']=='hypershap'))]
 
 df = df.drop_duplicates()
@@ -56,7 +59,8 @@ for _, row in df.iterrows():
     # Construct the command dynamically, skipping None values
     #command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
     command = "sbatch start_create_cmds.sh "
-    command += f" ''+task/subselection/multiobjective/dev={row['task']}''"
+    # command += f" '+task/subselection/multiobjective/dev={row['task']}'"
+    # command += f" '+task/subselection/multiobjective/dev_mini=glob(*)'"
 
     baserundir = "results/"
     
@@ -64,9 +68,7 @@ for _, row in df.iterrows():
     baserundir += f"{row['hpi_method']}/"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs={row['adjust_cs']}"
-    if row['adjust_cs'] == 'true':
-        baserundir += f"adjust_cs_{row['adjust_cs_method']}"
-        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_cs_method={row['adjust_cs']}"
+    baserundir += f"adjust_cs_{row['adjust_cs']}"
     
     if row['cs_proba_hpi'] is not None:
         command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.cs_proba_hpi={row['cs_proba_hpi']}"
@@ -74,16 +76,14 @@ for _, row in df.iterrows():
             baserundir += "_cs_proba_hpi"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs={row['adjust_previous_cfgs']}"
-    if row['adjust_previous_cfgs'] == 'true': 
-        baserundir += "_adjust_prev_cfgs"
+    baserundir += f"_adjust_prev_cfgs_{row['adjust_previous_cfgs']}"
     
     if row['set_to'] is not None:
         command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to={row['set_to']}"
         baserundir += f"_set_to_{row['set_to']}"
     
-    if row['thresh'] is not None:
-        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh={row['thresh'][1]}"
-        baserundir += f"_thresh_{row['thresh'][0]}"
+    command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh={row['thresh'][1]}"
+    baserundir += f"_thresh_{row['thresh'][0]}"
         
         
     command += f" baserundir={baserundir}"
