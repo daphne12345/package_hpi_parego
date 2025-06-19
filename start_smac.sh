@@ -36,7 +36,7 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,3)' baserundir=results_ "
+HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev_mini=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,3)' baserundir=results_smac_baseline "
 # HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev_mini=glob(*)' +optimizer/randomsearch=config 'seed=range(0,3)' baserundir=results_random_search "
 
 # ['task/HPOBench/multiobjective/tabular/ml=glob(*)', 'task/Pymoo/MO/unconstraint=glob(*)', 'task/Pymoo/ManyO/unconstraint=glob(*)', 'task/YAHPO/MO=glob(*)']

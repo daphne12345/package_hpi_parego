@@ -5,40 +5,40 @@ import time
 
 hpi_method = ['fanova']
 # adjust_cs = ['default', 'random', 'incumbent', 'no']
-adjust_cs = ['default']
+adjust_cs = ['no']
 # cs_proba_hpi = ['true', 'false']
 cs_proba_hpi = ['false']
 
-adjust_previous_cfgs = ['no', 'true_retrain', 'true_no_retrain'] 
+adjust_previous_cfgs = ['no']#, 'true_retrain', 'true_no_retrain'] 
 # adjust_previous_cfgs = ['true_retrain_pc'] 
 # set_to = ['random', 'default', 'incumbent']
 set_to = ['default']
-gt_hpi = ['true', 'false']
+gt_hpi = ['false']
 
 
 # thresh = [('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('0-075-0','[0.0,0.75,0.75,0.75,0.0]'), ('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('down-0','[0.9,0.7,0.5,0.3,0.0]'), ('0-down','[0.0,0.9,0.7,0.5,0.3]'), 
 #           ('0-down-0-fine','[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]'), ('075','0.75'), ('cos','[0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220,0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220]')]
-thresh = [('0-075','[0.0,0.75]'), ('0-down-half' ,'[0.0,0.0,0.0,0.0,0.8,0.6,0.4,0.0]')]
+thresh = [('0-075','[0.0,0.75]')]#, ('0-down-half' ,'[0.0,0.0,0.0,0.0,0.8,0.6,0.4,0.0]')]
 
 
-# task = ['subset_hpobench_multiobjective_tabular_ml_lr_167120', 'subset_hpobench_multiobjective_tabular_ml_nn_3917', 
-#         'subset_hpobench_multiobjective_tabular_ml_rf_168911', 'subset_hpobench_multiobjective_tabular_ml_svm_168911',
-#         'subset_hpobench_multiobjective_tabular_ml_xgboost_3917', 
-#         'subset_Pymoo_ManyO_unconstraint_dtlz1', 
-#         'subset_Pymoo_MO_unconstraint_kursawe',
-#         'subset_yahpo_mo_iaml_glmnet_1489_None',  'subset_yahpo_mo_iaml_ranger_1489_None', 
-#         'subset_yahpo_mo_rbv2_xgboost_28_None']
+task = ['subset_hpobench_multiobjective_tabular_ml_lr_167120', 'subset_hpobench_multiobjective_tabular_ml_nn_3917', 
+        'subset_hpobench_multiobjective_tabular_ml_rf_168911', 'subset_hpobench_multiobjective_tabular_ml_svm_168911',
+        'subset_hpobench_multiobjective_tabular_ml_xgboost_3917', 
+        'subset_Pymoo_ManyO_unconstraint_dtlz1', 
+        'subset_Pymoo_MO_unconstraint_kursawe',
+        'subset_yahpo_mo_iaml_glmnet_1489_None',  'subset_yahpo_mo_iaml_ranger_1489_None', 
+        'subset_yahpo_mo_rbv2_xgboost_28_None']
 
-task = ['subset_Pymoo_ManyO_unconstraint_dtlz1', 
-'subset_Pymoo_ManyO_unconstraint_dtlz5', 
-'subset_Pymoo_ManyO_unconstraint_dtlz6', 
-'subset_Pymoo_ManyO_unconstraint_dtlz7', 
-'subset_Pymoo_ManyO_unconstraint_wfg2_10_5', 
-'subset_Pymoo_ManyO_unconstraint_wfg3_10_5', 
-'subset_Pymoo_MO_unconstraint_kursawe', 
-'subset_Pymoo_MO_unconstraint_zdt1', 
-'subset_Pymoo_MO_unconstraint_zdt2', 
-'subset_Pymoo_MO_unconstraint_zdt6']
+# task = ['subset_Pymoo_ManyO_unconstraint_dtlz1', 
+# 'subset_Pymoo_ManyO_unconstraint_dtlz5', 
+# 'subset_Pymoo_ManyO_unconstraint_dtlz6', 
+# 'subset_Pymoo_ManyO_unconstraint_dtlz7', 
+# 'subset_Pymoo_ManyO_unconstraint_wfg2_10_5', 
+# 'subset_Pymoo_ManyO_unconstraint_wfg3_10_5', 
+# 'subset_Pymoo_MO_unconstraint_kursawe', 
+# 'subset_Pymoo_MO_unconstraint_zdt1', 
+# 'subset_Pymoo_MO_unconstraint_zdt2', 
+# 'subset_Pymoo_MO_unconstraint_zdt6']
 
 
 
@@ -84,7 +84,7 @@ for _, row in df.iterrows():
     command = "sbatch start_create_cmds.sh "
     command += f" '+task/subselection/multiobjective/dev={row['task']}'"
 
-    baserundir = "results_gt_hpi/"
+    baserundir = "results_smac_baseline/"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method={row['hpi_method']}"
     baserundir += f"{row['hpi_method']}/"
@@ -118,7 +118,7 @@ for _, row in df.iterrows():
     commands.append(command)
 
 # commands.reverse()
-for command in commands[:1]:
+for command in commands:
     process = subprocess.run(command, shell=True)
    
     if process.returncode != 0:

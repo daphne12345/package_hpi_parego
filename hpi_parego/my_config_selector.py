@@ -10,8 +10,7 @@ from ConfigSpace import Configuration
 from smac.acquisition.function.abstract_acquisition_function import (
     AbstractAcquisitionFunction,
 )
-
-from smac.acquisition.maximizer.abstract_acqusition_maximizer import (
+from smac.acquisition.maximizer.abstract_acquisition_maximizer import (
     AbstractAcquisitionMaximizer,
 )
 from smac.callback.callback import Callback
@@ -171,7 +170,6 @@ class MyConfigSelector:
                 mo.update_on_iteration_start()
 
             X, Y, X_configurations = self._collect_data()
-            # TODO reduce data
             previous_configs = self._runhistory.get_configs()
 
             if X.shape[0] == 0:
@@ -190,7 +188,7 @@ class MyConfigSelector:
 
             # Check if X/Y differs from the last run, otherwise use cached results
             if self._previous_entries != Y.shape[0]:
-                self._model.train(X, Y) # TODO
+                self._model.train(X, Y)
 
                 x_best_array: np.ndarray | None = None
                 if incumbent_value is not None:
