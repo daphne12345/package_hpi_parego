@@ -11,7 +11,9 @@ from smac.acquisition.function.abstract_acquisition_function import (
     AbstractAcquisitionFunction,
 )
 
-from smac.acquisition.maximizer.abstract_acquisition_maximizer import AbstractAcquisitionMaximizer
+from smac.acquisition.maximizer.abstract_acqusition_maximizer import (
+    AbstractAcquisitionMaximizer,
+)
 from smac.callback.callback import Callback
 from smac.initial_design import AbstractInitialDesign
 from smac.model.abstract_model import AbstractModel

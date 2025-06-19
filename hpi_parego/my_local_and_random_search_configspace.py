@@ -4,8 +4,10 @@ from typing import Any
 
 from ConfigSpace import Configuration, ConfigurationSpace, CategoricalHyperparameter, UniformFloatHyperparameter, NormalFloatHyperparameter, UniformIntegerHyperparameter, NormalIntegerHyperparameter, Constant
 
-from smac.acquisition.function import AbstractAcquisitionFunction
-from smac.acquisition.maximizer.abstract_acquisition_maximizer import AbstractAcquisitionMaximizer
+from smac.acquisition.function import (
+    AbstractAcquisitionFunction,
+)
+from smac.acquisition.maximizer.abstract_acqusition_maximizer import AbstractAcquisitionMaximizer
 from smac.acquisition.maximizer.local_search import LocalSearch
 from smac.acquisition.maximizer.random_search import RandomSearch
 from smac.utils.logging import get_logger
@@ -25,6 +27,8 @@ from collections import defaultdict
 import pickle as pckl
 from pathlib import Path
 import json
+import ast
+from smac.utils.multi_objective import normalize_costs
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -75,6 +79,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         seed: int = 0,
         uniform_configspace: ConfigurationSpace | None = None,
         prior_sampling_fraction: float | None = None,
+        multi_objective_algorithm=None,
         adjust_cs='default',
         hpi_method='fanova',
         adjust_previous_cfgs='no',
@@ -82,7 +87,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         thresh=0.5,
         n_trials=100,
         path_to_run=None,
-        cs_proba_hpi=False
+        cs_proba_hpi=False,
+        gt_hpi=False
     ) -> None:
         super().__init__(
             configspace,
@@ -104,6 +110,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.cs_proba_hpi = cs_proba_hpi
         self.incumbent = self._original_cs.sample_configuration()
         self.thresh_list = self.thresh if not isinstance(self.thresh, float) else None
+        self.gt_hpi = gt_hpi # wether to use the ground truth hpi from the random search
+        self.hps_guess = []
+        self._multi_objective_algorithm = multi_objective_algorithm
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -177,6 +186,26 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
 
         return meta
     
+    def to_cfg(self, cfg_str):
+        return Configuration(
+            configuration_space=self._original_cs,
+            values={x: ast.literal_eval(cfg_str)[i] for i, x in enumerate(self._original_cs)},
+        )
+    
+    def get_objective_bounds(self, costs):
+        min_values = np.min(costs, axis=0)
+        max_values = np.max(costs, axis=0)
+
+        objective_bounds = []
+        for min_v, max_v in zip(min_values, max_values):
+            objective_bounds += [(min_v, max_v)]
+        return objective_bounds
+    
+    def convert_Y(self, y, objective_bounds):
+        y = list(ast.literal_eval(y))
+        y = normalize_costs(y, objective_bounds)
+        return self._multi_objective_algorithm(y)
+    
     def _calculate_hpi_fanova(self, configs):
         """Calculates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.
 
@@ -186,10 +215,31 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         Returns:
             _type_: list of important hps
         """
+        if not self.gt_hpi:
+            X = convert_configurations_to_array(configs)
+            Y = self._acquisition_function.model.predict_marginalized(X)[0]
+            return self._cal_fanova(X, Y)
+        
+        df_rnd = pd.read_parquet('results_random_search/logs.parquet')
+        task = f"multi-objective/50/dev/{'/'.join(str(self.path_to_run).split('/')[8:-3])}"
+        print('task', task)
+        df_rnd = df_rnd[(df_rnd['task_id']==task) & (df_rnd['seed']==self._seed)]
+        print('shape of df_rnd', df_rnd.shape)
+        rnd_cfgs = df_rnd['trial_info__config'].apply(self.to_cfg).to_list()
+        X = convert_configurations_to_array(rnd_cfgs)
+        objective_bounds = self.get_objective_bounds(df_rnd['trial_value__cost_raw'].apply(lambda y: ast.literal_eval(y)).tolist())
+        Y = df_rnd['trial_value__cost_raw'].apply(lambda y: self.convert_Y(y, objective_bounds)).to_numpy()
+        hps_gt, hpis = self._cal_fanova(X, Y)
+          
         X = convert_configurations_to_array(configs)
         Y = self._acquisition_function.model.predict_marginalized(X)[0]
+        hps_guess, _ = self._cal_fanova(X, Y)
+        self.hps_guess.append(hps_guess)
+        pckl.dump(self.hps_guess, open(self.path_to_run / 'hps_guess.pckl', 'wb'))
+        return hps_gt, hpis
+            
 
-        print('Path', self.path_to_run)
+    def _cal_fanova(self, X, Y):
         run = SMAC3v2Run.from_path(self.path_to_run)
         fanova = fANOVAWeighted(run)
         fanova.train_model(X, Y)
@@ -283,7 +333,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
         print(self.hpi, self.set_to, self.adjust_cs)
-        if self.set_to=='incumbent' or self.adjust_cs=='incumbent' or self.adjust_previous_cfgs=='true_retrain':
+        if self.set_to=='incumbent' or self.adjust_cs=='incumbent' or self.adjust_cs=='rnd_inc' or self.adjust_previous_cfgs=='true_retrain':
             X = convert_configurations_to_array(previous_configs)
             # Y,_ = self._acquisition_function._model.predict(X)
             Y = self._acquisition_function.model.predict_marginalized(X)[0]
@@ -322,15 +372,18 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                         self.adjust_configspace(important_hps)
                 if self.adjust_previous_cfgs!='no':
                     previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
-                    if self.adjust_previous_cfgs=='true_retrain':
+                    if self.adjust_previous_cfgs=='true_retrain' or self.adjust_previous_cfgs=='true_retrain_pc':
+                        if self.adjust_previous_cfgs=='true_retrain_pc':
+                            previous_configs.extend(actual_previous_configs)
                         X = convert_configurations_to_array(previous_configs)
                         with (self.path_to_run / "runhistory.json").open() as json_file:
                             all_data = json.load(json_file)
-                            print(all_data['data'])
                             costs = {data['config_id']: data['cost'] for data in all_data["data"]}
                         Y = np.array(list(costs.values()))
                         if self.set_to=='random': #random augmentation will be 6 times longer
                             Y = np.array(list(Y)*6)
+                        if self.adjust_previous_cfgs=='true_retrain_pc':
+                            Y = np.array(list(Y) + list(Y))
                         
                         self._acquisition_function.model.train(X, Y)
                         
@@ -373,7 +426,6 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         )
         
         # Check if configs are new
-        print('actual previous configs', actual_previous_configs)
         new_cfgs = all([cfg not in actual_previous_configs for i, (acq_value, cfg) in enumerate(next_configs_by_local_search)])
 
         if not new_cfgs:
@@ -413,11 +465,14 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 except:
                     new_cs.add_hyperparameter(hp)
             else:
+                run = SMAC3v2Run.from_path(self.path_to_run)
+                current_trial = len(run.trial_keys)
                 if self.adjust_cs=='default':
                     hp_value = hp.default_value  
                 elif self.adjust_cs=='incumbent':
                     hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
-
+                elif (self.adjust_cs=='rnd_inc') & (current_trial > self.n_trials//2):
+                    hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.sample_value()
                 else:
                     hp_value = hp.sample_value()
                 # if self.constant:
@@ -483,13 +538,18 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         new_cs = ConfigurationSpace()
         new_cs.random.set_state(random_state)
 
-        for hp in self._original_cs.values():
+        for hp in self._original_cs.values():                
+            run = SMAC3v2Run.from_path(self.path_to_run)
+            current_trial = len(run.trial_keys)
             if self.adjust_cs=='default':
                 hp_value = hp.default_value  
             elif self.adjust_cs=='incumbent':
                 hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
+            elif (self.adjust_cs=='rnd_inc') & (current_trial > self.n_trials//2):
+                hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.sample_value()
             else:
                 hp_value = hp.sample_value()
+            
             if isinstance(hp, CategoricalHyperparameter):
                 new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
                 new_hp = CategoricalHyperparameter(

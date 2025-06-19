@@ -10,6 +10,7 @@ optimizer:
       acquisition_maximizer:
         _target_: hpi_parego.my_local_and_random_search_configspace.MyLocalAndSortedRandomSearchConfigSpace
         _partial_: true
+        multi_objective_algorithm: ${optimizer.smac_cfg.smac_kwargs.multi_objective_algorithm}
         path_to_run: ${optimizer.smac_cfg.scenario.output_directory}/${optimizer.smac_cfg.scenario.name}/${optimizer.smac_cfg.scenario.seed}
         adjust_cs: default #'default', 'random', 'incumbent', 'no'
         hpi_method: fanova
@@ -18,6 +19,7 @@ optimizer:
         thresh: 0.5 # [0.0,0.2,0.4,0.6,0.8,0.0]
         cs_proba_hpi: false
         n_trials: ${optimizer.smac_cfg.scenario.n_trials}   
+        gt_hpi: false
       acquisition_function:
         _target_: hpi_parego.my_ei_hpi.MyEI
       config_selector:

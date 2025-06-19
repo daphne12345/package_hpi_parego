@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -t 2:00:00
+#SBATCH -t 3:00:00
 #SBATCH -J "hydra_launcher"
 #SBATCH -p normal
 #SBATCH --mem=32GB
@@ -36,13 +36,10 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,3)'"
-# ['subset_yahpo_mo_iaml_glmnet_1489_None',
-# 'subset_yahpo_mo_iaml_ranger_1489_None',
-# 'subset_yahpo_mo_rbv2_ranger_375_None',
-# 'subset_yahpo_mo_rbv2_xgboost_28_None',
-# 'subset_yahpo_mo_rbv2_xgboost_182_None']
-#'subset_hpobench_multiobjective_tabular_ml_lr_53', 'subset_hpobench_multiobjective_tabular_ml_lr_9952', 'subset_hpobench_multiobjective_tabular_ml_lr_9977'
+HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,3)' baserundir=results_ "
+# HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev_mini=glob(*)' +optimizer/randomsearch=config 'seed=range(0,3)' baserundir=results_random_search "
+
+# ['task/HPOBench/multiobjective/tabular/ml=glob(*)', 'task/Pymoo/MO/unconstraint=glob(*)', 'task/Pymoo/ManyO/unconstraint=glob(*)', 'task/YAHPO/MO=glob(*)']
 # Add all Hydra overrides
 for override in "${HYDRA_OVERRIDES[@]}"; do
     HYDRA_CMD+=" $override"
