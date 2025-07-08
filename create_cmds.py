@@ -4,29 +4,29 @@ import subprocess
 import time
 
 hpi_method = ['fanova']
-# adjust_cs = ['default', 'random', 'incumbent', 'no']
-adjust_cs = ['no']
-# cs_proba_hpi = ['true', 'false']
-cs_proba_hpi = ['false']
+adjust_cs = ['default', 'random', 'incumbent', 'no']
+cs_proba_hpi = ['false','true']
 
-adjust_previous_cfgs = ['no']#, 'true_retrain', 'true_no_retrain'] 
-# adjust_previous_cfgs = ['true_retrain_pc'] 
-# set_to = ['random', 'default', 'incumbent']
-set_to = ['default']
+adjust_previous_cfgs = ['no', 'true_no_retrain', 'true_retrain'] 
+set_to = ['random', 'default', 'incumbent']
 gt_hpi = ['false']
 
 
 # thresh = [('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('0-075-0','[0.0,0.75,0.75,0.75,0.0]'), ('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('down-0','[0.9,0.7,0.5,0.3,0.0]'), ('0-down','[0.0,0.9,0.7,0.5,0.3]'), 
 #           ('0-down-0-fine','[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]'), ('075','0.75'), ('cos','[0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220,0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220]')]
-thresh = [('0-075','[0.0,0.75]')]#, ('0-down-half' ,'[0.0,0.0,0.0,0.0,0.8,0.6,0.4,0.0]')]
+# thresh = [('0-075','[0.0,0.75]'), ('0-down-half' ,'[0.0,0.0,0.0,0.0,0.8,0.6,0.4,0.0]')]
+# thresh = [('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]')]
+# thresh = [('0-05','[0.0,0.5]'), ('0-75','[0.0,0.75]'), ('075','0.75'),('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'))]
+thresh = [('075','0.75')]
 
-
-task = ['subset_hpobench_multiobjective_tabular_ml_lr_167120', 'subset_hpobench_multiobjective_tabular_ml_nn_3917', 
-        'subset_hpobench_multiobjective_tabular_ml_rf_168911', 'subset_hpobench_multiobjective_tabular_ml_svm_168911',
+task = ['subset_hpobench_multiobjective_tabular_ml_nn_3917', 
+        'subset_hpobench_multiobjective_tabular_ml_rf_168911', 
+        'subset_hpobench_multiobjective_tabular_ml_svm_168911',
         'subset_hpobench_multiobjective_tabular_ml_xgboost_3917', 
-        'subset_Pymoo_ManyO_unconstraint_dtlz1', 
+        'subset_Pymoo_ManyO_unconstraint_dtlz7', 
         'subset_Pymoo_MO_unconstraint_kursawe',
-        'subset_yahpo_mo_iaml_glmnet_1489_None',  'subset_yahpo_mo_iaml_ranger_1489_None', 
+        'subset_yahpo_mo_iaml_glmnet_1489_None', 
+        'subset_yahpo_mo_iaml_ranger_1489_None', 
         'subset_yahpo_mo_rbv2_xgboost_28_None']
 
 # task = ['subset_Pymoo_ManyO_unconstraint_dtlz1', 
@@ -50,16 +50,16 @@ combinations = list(product(
     cs_proba_hpi,
     set_to,
     thresh,
+    gt_hpi,
     task,
-    gt_hpi
 ))
 
 columns = [
     'hpi_method', 'adjust_cs', 'adjust_previous_cfgs',
     'cs_proba_hpi', 'set_to',
-    'thresh'
-    ,'task',
-    'gt_hpi'
+    'thresh',
+    'gt_hpi',
+    'task'
 ]
 df = pd.DataFrame(combinations, columns=columns)
 
@@ -84,7 +84,7 @@ for _, row in df.iterrows():
     command = "sbatch start_create_cmds.sh "
     command += f" '+task/subselection/multiobjective/dev={row['task']}'"
 
-    baserundir = "results_smac_baseline/"
+    baserundir = "results_new_ablation/"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method={row['hpi_method']}"
     baserundir += f"{row['hpi_method']}/"

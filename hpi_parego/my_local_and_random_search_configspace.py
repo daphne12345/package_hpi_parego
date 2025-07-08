@@ -79,7 +79,6 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         seed: int = 0,
         uniform_configspace: ConfigurationSpace | None = None,
         prior_sampling_fraction: float | None = None,
-        multi_objective_algorithm=None,
         adjust_cs='default',
         hpi_method='fanova',
         adjust_previous_cfgs='no',
@@ -112,7 +111,6 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.thresh_list = self.thresh if not isinstance(self.thresh, float) else None
         self.gt_hpi = gt_hpi # wether to use the ground truth hpi from the random search
         self.hps_guess = []
-        self._multi_objective_algorithm = multi_objective_algorithm
 
         if uniform_configspace is not None and prior_sampling_fraction is None:
             prior_sampling_fraction = 0.5
@@ -186,10 +184,18 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         return meta
     
     def to_cfg(self, cfg_str):
+        # return Configuration(
+        #     configuration_space=self._original_cs,
+        #     values={x: ast.literal_eval(cfg_str)[i] for i, x in enumerate(self._original_cs)},
+        #     )
+        cfg_dict = dict(zip(self._original_cs.get_hyperparameter_names(), ast.literal_eval(cfg_str)))
         return Configuration(
-            configuration_space=self._original_cs,
-            values={x: ast.literal_eval(cfg_str)[i] for i, x in enumerate(self._original_cs)},
+        configuration_space=self._original_cs,
+        values=cfg_dict,
+        allow_inactive_with_values=True
         )
+
+            
     
     def get_objective_bounds(self, costs):
         min_values = np.min(costs, axis=0)
@@ -203,7 +209,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
     def convert_Y(self, y, objective_bounds):
         y = list(ast.literal_eval(y))
         y = normalize_costs(y, objective_bounds)
-        return self._multi_objective_algorithm(y)
+        #ParEGO
+        theta_f = self.acquisition_function._theta * y
+        return float(np.max(theta_f, axis=0) + self._acquisition_function._rho * np.sum(theta_f, axis=0))
     
     def _calculate_hpi_fanova(self, configs):
         """Calculates the HPI based on fANOVA and return the top 50% quantile of important hyperparameters.

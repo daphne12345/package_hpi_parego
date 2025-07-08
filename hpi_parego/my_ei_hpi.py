@@ -60,7 +60,8 @@ class MyEI(EI):
         self,
         xi: float = 0.0,
         log: bool = False,
-        theta: float = 0.5
+        theta: float = 0.5,
+        rho:float = 0.05
     ) -> None:
         super(EI, self).__init__()
 
@@ -68,6 +69,7 @@ class MyEI(EI):
         self._log: bool = log
         self._eta: float | None = None
         self._theta: float = theta
+        self._rho: float = rho
 
     @property
     def name(self) -> str:  # noqa: D102
@@ -80,7 +82,8 @@ class MyEI(EI):
             {
                 "xi": self._xi,
                 "log": self._log,
-                "theta": self._theta
+                "theta": self._theta,
+                "rho": self._rho
             }
         )
 
@@ -96,11 +99,14 @@ class MyEI(EI):
         xi : float, optional
             Exploration-exploitation trade-off parameter
         """
-        assert "eta" in kwargs
-        self._eta = kwargs["eta"]
+        if "eta" in kwargs:
+            self._eta = kwargs["eta"]
 
-        assert "theta" in kwargs
-        self._theta = kwargs["theta"]
+        if "theta" in kwargs:
+            self._theta = kwargs["theta"]
+        
+        if "rho" in kwargs:
+            self._rho = kwargs["rho"]
 
         if "xi" in kwargs and kwargs["xi"] is not None:
             self._xi = kwargs["xi"]

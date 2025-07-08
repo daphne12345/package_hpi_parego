@@ -36,8 +36,17 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev_mini=glob(*)' +optimizer/smac20=multiobjective_rf 'seed=range(0,3)' baserundir=results_smac_baseline "
-# HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev_mini=glob(*)' +optimizer/randomsearch=config 'seed=range(0,3)' baserundir=results_random_search "
+HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=subset_hpobench_multiobjective_tabular_ml_nn_3917' +optimizer/smac20=multiobjective_rf 'seed=0' baserundir=delete"
+# HYDRA_CMD="python -m carps.run '+task/subselection/multiobjective/dev=glob(*)' +optimizer/randomsearch=config 'seed=range(0,3)' baserundir=results_random_search "
+# task = ['subset_hpobench_multiobjective_tabular_ml_nn_3917', 
+#         'subset_hpobench_multiobjective_tabular_ml_rf_168911', 
+#         'subset_hpobench_multiobjective_tabular_ml_svm_168911',
+#         'subset_hpobench_multiobjective_tabular_ml_xgboost_3917', 
+#         'subset_Pymoo_ManyO_unconstraint_dtlz7', 
+#         'subset_Pymoo_MO_unconstraint_kursawe',
+#         'subset_yahpo_mo_iaml_glmnet_1489_None', 
+#         'subset_yahpo_mo_iaml_ranger_1489_None', 
+#         'subset_yahpo_mo_rbv2_xgboost_28_None']
 
 # ['task/HPOBench/multiobjective/tabular/ml=glob(*)', 'task/Pymoo/MO/unconstraint=glob(*)', 'task/Pymoo/ManyO/unconstraint=glob(*)', 'task/YAHPO/MO=glob(*)']
 # Add all Hydra overrides

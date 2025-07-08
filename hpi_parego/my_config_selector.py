@@ -205,7 +205,8 @@ class MyConfigSelector:
                     incumbent_array=x_best_array,
                     num_data=len(self._get_evaluated_configs()),
                     X=X_configurations,
-                    theta=mo._theta
+                    theta=mo._theta,
+                    rho=mo._rho
                 )
 
             # We want to cache how many entries we used because if we have the same number of entries
