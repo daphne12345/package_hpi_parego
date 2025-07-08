@@ -96,10 +96,11 @@ if __name__ == "__main__":
         mlp.configspace,
         objectives=objectives,
         walltime_limit=300,  # After 30 seconds, we stop the hyperparameter optimization
-        n_trials=200,  # Evaluate max 200 different trials
+        n_trials=100,  # Evaluate max 200 different trials
         n_workers=1,
         name='smac3output',
-        output_directory='test'
+        output_directory='test',
+        seed=0
     )
 
     # We want to run five random configurations before starting the optimization.
@@ -110,7 +111,7 @@ if __name__ == "__main__":
     my_acquisition_function = MyEI()
     my_config_selector = MyConfigSelector(scenario)
     my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, hpi_method='fanova',
-        adjust_previous_cfgs='no', set_to='random', cs_proba_hpi=False, gt_hpi=False, multi_objective_algorithm=multi_objective_algorithm)
+        adjust_previous_cfgs='no', rnd_aug_pc=True, adjust_cs='random', cs_proba_hpi=True, gt_hpi=False, multi_objective_algorithm=multi_objective_algorithm, thresh=[0.75])
     
 
     # Create our SMAC object and pass the scenario and the train method
@@ -128,44 +129,54 @@ if __name__ == "__main__":
 
     # Let's optimize
     incumbents = smac.optimize()
+    # Get cost of default configuration
+    default_cost = smac.validate(mlp.configspace.get_default_configuration())
+    print(f"Validated costs from default config: \n--- {default_cost}\n")
+
+    print("Validated costs from the Pareto front (incumbents):")
+    for incumbent in incumbents:
+        cost = smac.validate(incumbent)
+        print("---", cost)
+    
 
         
-    #baseline
+    # baseline
 
     # Define our environment variables
-    scenario = Scenario(
-        mlp.configspace,
-        objectives=objectives,
-        walltime_limit=300,  # After 30 seconds, we stop the hyperparameter optimization
-        n_trials=200,  # Evaluate max 200 different trials
-        n_workers=1,
-        name='baseline',
-        output_directory='test'
-    )
+    # scenario = Scenario(
+    #     mlp.configspace,
+    #     objectives=objectives,
+    #     walltime_limit=300,  # After 30 seconds, we stop the hyperparameter optimization
+    #     n_trials=200,  # Evaluate max 200 different trials
+    #     n_workers=1,
+    #     name='baseline',
+    #     output_directory='test',
+    #     seed=0
+    # )
 
     # We want to run five random configurations before starting the optimization.
-    initial_design = HPOFacade.get_initial_design(scenario, n_configs=5)
-    multi_objective_algorithm = ParEGO(scenario)
-    intensifier = HPOFacade.get_intensifier(scenario, max_config_calls=2)
+    # initial_design = HPOFacade.get_initial_design(scenario, n_configs=5)
+    # multi_objective_algorithm = ParEGO(scenario)
+    # intensifier = HPOFacade.get_intensifier(scenario, max_config_calls=2)
 
     # Create our SMAC object and pass the scenario and the train method
-    smac = HPOFacade(
-        scenario,
-        mlp.train,
-        initial_design=initial_design,
-        multi_objective_algorithm=multi_objective_algorithm,
-        intensifier=intensifier,
-        overwrite=True,
-    )
+    # smac = HPOFacade(
+    #     scenario,
+    #     mlp.train,
+    #     initial_design=initial_design,
+    #     multi_objective_algorithm=multi_objective_algorithm,
+    #     intensifier=intensifier,
+    #     overwrite=True,
+    # )
 
     # Let's optimize
-    incumbents = smac.optimize()
+    # incumbents = smac.optimize()
 
-    # # Get cost of default configuration
+    # Get cost of default configuration
     # default_cost = smac.validate(mlp.configspace.get_default_configuration())
     # print(f"Validated costs from default config: \n--- {default_cost}\n")
 
-    # print("Validated costs from the Pareto front (incumbents):")
+    # print("Baseline: Validated costs from the Pareto front (incumbents):")
     # for incumbent in incumbents:
     #     cost = smac.validate(incumbent)
     #     print("---", cost)

@@ -15,7 +15,7 @@ optimizer:
         adjust_cs: default #'default', 'random', 'incumbent', 'no'
         hpi_method: fanova
         adjust_previous_cfgs: no #'true_no_retrain', 'no', 'true_retrain'
-        set_to: default # default, random or incumbent   
+        rnd_aug_pc: false # random augmentation of previous configs  
         thresh: 0.5 # [0.0,0.2,0.4,0.6,0.8,0.0]
         cs_proba_hpi: false
         n_trials: ${optimizer.smac_cfg.scenario.n_trials}   

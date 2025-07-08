@@ -25,3 +25,4 @@ figures/*
 *.pkl
 *.png
 tmp/*
+*.parquet

@@ -29,6 +29,7 @@ from pathlib import Path
 import json
 import ast
 from smac.utils.multi_objective import normalize_costs
+from sklearn.metrics import f1_score
 
 __copyright__ = "Copyright 2025, Leibniz University Hanover, Institute of AI"
 __license__ = "3-clause BSD"
@@ -83,7 +84,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         adjust_cs='default',
         hpi_method='fanova',
         adjust_previous_cfgs='no',
-        set_to='default',
+        rnd_aug_pc=False,
         thresh=0.5,
         n_trials=100,
         path_to_run=None,
@@ -103,7 +104,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         self.adjust_cs = adjust_cs # whether to adjust the configspace for sampling ('default', 'random', 'incumbent', 'no')
         self.hpi=hpi_method # fanova or hypershap
         self.adjust_previous_cfgs = adjust_previous_cfgs # whther to adjust the previous configs for search ('true_no_retrain', 'no', 'true_retrain')
-        self.set_to = set_to # whether to adjust the previous configs by setting the unimportant hps to default or random augmentation
+        self.rnd_aug_pc = rnd_aug_pc # whether to adjust the previous configs by setting the unimportant hps to default or random augmentation
         self.thresh = thresh # threshold or threshlist for quantile cut off for hpi
         self.n_trials = n_trials
         self.important_hps = []
@@ -235,6 +236,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         hps_guess, _ = self._cal_fanova(X, Y)
         self.hps_guess.append(hps_guess)
         pckl.dump(self.hps_guess, open(self.path_to_run / 'hps_guess.pckl', 'wb'))
+        self.fscores = f1_score(hps_gt, hps_guess)
+        pckl.dump(self.fscores, open(self.path_to_run / 'fscores_hps.pckl', 'wb'))
         return hps_gt, hpis
             
 
@@ -331,8 +334,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         actual_previous_configs = previous_configs.copy()
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
-        print(self.hpi, self.set_to, self.adjust_cs)
-        if self.set_to=='incumbent' or self.adjust_cs=='incumbent' or self.adjust_cs=='rnd_inc' or self.adjust_previous_cfgs=='true_retrain':
+        print(self.hpi, self.adjust_cs)
+        if self.adjust_cs=='incumbent' or self.adjust_cs=='rnd_inc' or self.adjust_previous_cfgs=='true_retrain':
             X = convert_configurations_to_array(previous_configs)
             # Y,_ = self._acquisition_function._model.predict(X)
             Y = self._acquisition_function.model.predict_marginalized(X)[0]
@@ -378,16 +381,21 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                         with (self.path_to_run / "runhistory.json").open() as json_file:
                             all_data = json.load(json_file)
                             costs = {data['config_id']: data['cost'] for data in all_data["data"]}
-                        Y = np.array(list(costs.values()))
-                        if self.set_to=='random': #random augmentation will be 6 times longer
-                            Y = np.array(list(Y)*6)
+                        if len(costs.values())!=len(actual_previous_configs):
+                            cfg_id_missing = set(costs.keys()) - set([cfg.config_id for cfg in actual_previous_configs])
+                            costs = {k:v for k,v in costs.items() if k not in cfg_id_missing}
+                            print(cfg_id_missing, 'cfgs missing in previous_cfgs')
+                        Y = list(costs.values())
+                        if self.rnd_aug_pc: #random augmentation will be 6 times longer
+                            Y = 6*Y
                         if self.adjust_previous_cfgs=='true_retrain_pc':
-                            Y = np.array(list(Y) + list(Y))
+                            Y = 2*Y
                         
+                        Y = np.array([self._multi_objective_algorithm(y) for y in Y])
                         self._acquisition_function.model.train(X, Y)
                         
                         Y = self._acquisition_function.model.predict_marginalized(X)[0]
-                        self._acquisition_function.update({'eta': np.min(Y)})
+                        self._acquisition_function.update(model=self._acquisition_function.model, eta=np.min(Y), theta=self._acquisition_function._theta)
 
         if self._uniform_configspace is not None and self._prior_sampling_fraction is not None:
             # Get configurations sorted by acquisition function value
@@ -464,22 +472,12 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 except:
                     new_cs.add_hyperparameter(hp)
             else:
-                run = SMAC3v2Run.from_path(self.path_to_run)
-                current_trial = len(run.trial_keys)
                 if self.adjust_cs=='default':
                     hp_value = hp.default_value  
                 elif self.adjust_cs=='incumbent':
                     hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
-                elif (self.adjust_cs=='rnd_inc') & (current_trial > self.n_trials//2):
-                    hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.sample_value()
                 else:
                     hp_value = hp.sample_value()
-                # if self.constant:
-                #     new_hp = Constant(
-                #         name=hp.name,
-                #         value=hp_value
-                #     )
-                # else: #distribution
                 if isinstance(hp, CategoricalHyperparameter):
                     new_weights = [1 if choice == hp_value else 0 for choice in hp.choices]
                     new_hp = CategoricalHyperparameter(
@@ -509,13 +507,12 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                     
                 else:
                     new_hp = hp
-                    print(f"Hyperparameter {hp} not supported. Using old hp values.")
+                    print(f"Hyperparameter {hp} of type {type(hp)} not supported. Using old hp values.")
 
                 try:
                     new_cs.add(new_hp)
                 except:
                     new_cs.add_hyperparameter(new_hp)
-        # if not self.constant:
         new_cs.add_conditions(self._original_cs.get_conditions())
         
         self._configspace = new_cs
@@ -538,14 +535,10 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         new_cs.random.set_state(random_state)
 
         for hp in self._original_cs.values():                
-            run = SMAC3v2Run.from_path(self.path_to_run)
-            current_trial = len(run.trial_keys)
             if self.adjust_cs=='default':
                 hp_value = hp.default_value  
             elif self.adjust_cs=='incumbent':
                 hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.default_value
-            elif (self.adjust_cs=='rnd_inc') & (current_trial > self.n_trials//2):
-                hp_value = self.incumbent[hp.name] if hp.name in self.incumbent else hp.sample_value()
             else:
                 hp_value = hp.sample_value()
             
@@ -594,6 +587,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         else:  
             self._random_search._configspace = new_cs
     
+
     def update(self, cfg, hp, old_cfg):
         cfg_change =  copy.copy(cfg)
         try:
@@ -604,20 +598,24 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         return cfg_change
     
     def adjust_previous_configs(self, previous_configs, important_hps):
-        hps_unimportant = list(set(self._original_cs.get_hyperparameter_names())-set(important_hps))
+        hps_unimportant = list(set(self._configspace.get_hyperparameter_names())-set(important_hps))
         converted_configs = list(previous_configs)
-        if self.set_to != 'random':
-            target_cfg = self._original_cs.get_default_configuration() if self.set_to=='default' else self.incumbent 
-            for hp in hps_unimportant:
-                if hp in target_cfg:                    
-                    for i, cfg in enumerate(converted_configs):
-                        if hp in cfg:
-                            converted_configs[i] = self.update(cfg, hp, target_cfg) 
-        else: # random augmentation
+        target_cfg = self._configspace.get_default_configuration() 
+        for hp in hps_unimportant:
+            if hp in target_cfg:                    
+                for i, cfg in enumerate(converted_configs):
+                    if hp in cfg:
+                        converted_configs[i] = self.update(cfg, hp, target_cfg) 
+        
+        for cfg in converted_configs:
+            cfg.configspace = self._configspace
+            cfg.origin = 'adjusted'
+        
+        if self.rnd_aug_pc: # random augmentation
             for _ in range(5):
-                random_cfgs = self._original_cs.sample_configuration(len(previous_configs))
+                random_cfgs = self._configspace.sample_configuration(len(converted_configs))
                 for hp in important_hps:
                     for i in range(len(random_cfgs)):
-                        random_cfgs[i] = self.update(random_cfgs[i], hp, previous_configs[i])
+                        random_cfgs[i] = self.update(random_cfgs[i], hp, converted_configs[i])
                 converted_configs.extend(random_cfgs)
         return converted_configs
