@@ -399,7 +399,10 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                         if self.adjust_previous_cfgs=='true_retrain_pc':
                             Y = 2*Y
                         
-                        Y = np.array([self._multi_objective_algorithm(y) for y in Y])
+                        # Y = np.array([self._multi_objective_algorithm(y) for y in Y])
+                        objective_bounds = self.get_objective_bounds(Y)
+                        Y = np.array([self.convert_Y(y, objective_bounds) for y in Y])
+                        
                         self._acquisition_function.model.train(X, Y)
                         
                         Y = self._acquisition_function.model.predict_marginalized(X)[0]
@@ -579,7 +582,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                 
             else:
                 new_hp = hp
-                print(f"Hyperparameter {hp} not supported. Using old hp values.")
+                print(f"Hyperparameter {hp} of type {type(hp)} not supported. Using old hp values.")
 
             try:
                 new_cs.add(new_hp)
