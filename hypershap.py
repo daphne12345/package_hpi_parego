@@ -35,7 +35,7 @@ class HPIGame(Game, ABC):
 
     def get_default_config_performance(self) -> float:
         X = convert_configurations_to_array([self.cs.get_default_configuration()])
-        Y, _ = self._model.predict(X)
+        Y, _ = self._model.predict_marginalized(X)
         return self.aggregator(Y)
         
     def _before_first_value_function_hook(self):
@@ -60,7 +60,7 @@ class HPIGame(Game, ABC):
         cfgs = self.blind_parameters_according_to_coalition(self.cfgs, coalition)
         
         X = convert_configurations_to_array(cfgs)
-        Y,_ = self._model.predict(X)
+        Y,_ = self._model.predict_marginalized(X)
         return self.aggregator(Y)
 
     def blind_parameters_according_to_coalition(self, cfgs, coalition):

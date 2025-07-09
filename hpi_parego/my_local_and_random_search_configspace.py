@@ -304,7 +304,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             _type_: list of important hps
         """
             
-        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function._model)
+        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function.model)
         print('n hps:', hpo_game.n_players)
         if hpo_game.n_players <= 10:
             computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
