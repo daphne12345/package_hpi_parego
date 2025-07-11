@@ -27,3 +27,4 @@ figures/*
 tmp/*
 *.parquet
 results*
+random_search/*

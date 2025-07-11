@@ -208,7 +208,8 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         return objective_bounds
     
     def convert_Y(self, y, objective_bounds):
-        y = list(ast.literal_eval(y))
+        if isinstance(y, str):
+            y = list(ast.literal_eval(y))
         y = normalize_costs(y, objective_bounds)
         #ParEGO
         theta_f = self.acquisition_function._theta * y
@@ -228,7 +229,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             Y = self._acquisition_function.model.predict_marginalized(X)[0]
             return self._cal_fanova(X, Y)
         
-        df_rnd = pd.read_parquet('results_random_search/logs.parquet')
+        df_rnd = pd.read_parquet('random_search/logs.parquet')
         task = f"multi-objective/50/dev/{'/'.join(str(self.path_to_run).split('/')[8:-3])}"
         print('task', task)
         df_rnd = df_rnd[(df_rnd['task_id']==task) & (df_rnd['seed']==self._seed)]
@@ -343,7 +344,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         
         # TODO calculates the most important hps and sets the rest to be very unlikely in the configspaces.
         print(self.hpi, self.adjust_cs)
-        if self.adjust_cs=='incumbent' or self.adjust_cs=='rnd_inc' or self.adjust_previous_cfgs=='true_retrain':
+        if self.adjust_cs=='incumbent' or self.adjust_previous_cfgs=='true_retrain':
             X = convert_configurations_to_array(previous_configs)
             # Y,_ = self._acquisition_function._model.predict(X)
             Y = self._acquisition_function.model.predict_marginalized(X)[0]
@@ -384,7 +385,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
                     previous_configs = self.adjust_previous_configs(previous_configs, important_hps)
                     if self.adjust_previous_cfgs=='true_retrain' or self.adjust_previous_cfgs=='true_retrain_pc':
                         if self.adjust_previous_cfgs=='true_retrain_pc':
-                            previous_configs.extend(actual_previous_configs)
+                            previous_configs += actual_previous_configs
                         X = convert_configurations_to_array(previous_configs)
                         with (self.path_to_run / "runhistory.json").open() as json_file:
                             all_data = json.load(json_file)
@@ -624,9 +625,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         
         if self.rnd_aug_pc: # random augmentation
             for _ in range(5):
-                random_cfgs = self._configspace.sample_configuration(len(converted_configs))
+                random_cfgs = self._configspace.sample_configuration(len(previous_configs))
                 for hp in important_hps:
                     for i in range(len(random_cfgs)):
                         random_cfgs[i] = self.update(random_cfgs[i], hp, converted_configs[i])
-                converted_configs.extend(random_cfgs)
+                converted_configs += random_cfgs
         return converted_configs

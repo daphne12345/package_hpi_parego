@@ -4,11 +4,11 @@ import subprocess
 import time
 
 hpi_method = ['fanova']
-adjust_cs = ['default', 'random', 'incumbent', 'no']
-cs_proba_hpi = ['false','true']
+adjust_cs = ['no']
+cs_proba_hpi = ['false']
 
-adjust_previous_cfgs = ['no', 'true_no_retrain', 'true_retrain'] 
-set_to = ['random', 'default', 'incumbent']
+adjust_previous_cfgs = ['no'] 
+rnd_aug_pc = ['false']
 gt_hpi = ['false']
 
 
@@ -19,26 +19,9 @@ gt_hpi = ['false']
 # thresh = [('0-05','[0.0,0.5]'), ('0-75','[0.0,0.75]'), ('075','0.75'),('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'))]
 thresh = [('075','0.75')]
 
-task = ['subset_hpobench_multiobjective_tabular_ml_nn_3917', 
-        'subset_hpobench_multiobjective_tabular_ml_rf_168911', 
-        'subset_hpobench_multiobjective_tabular_ml_svm_168911',
-        'subset_hpobench_multiobjective_tabular_ml_xgboost_3917', 
-        'subset_Pymoo_ManyO_unconstraint_dtlz7', 
-        'subset_Pymoo_MO_unconstraint_kursawe',
-        'subset_yahpo_mo_iaml_glmnet_1489_None', 
-        'subset_yahpo_mo_iaml_ranger_1489_None', 
-        'subset_yahpo_mo_rbv2_xgboost_28_None']
 
-# task = ['subset_Pymoo_ManyO_unconstraint_dtlz1', 
-# 'subset_Pymoo_ManyO_unconstraint_dtlz5', 
-# 'subset_Pymoo_ManyO_unconstraint_dtlz6', 
-# 'subset_Pymoo_ManyO_unconstraint_dtlz7', 
-# 'subset_Pymoo_ManyO_unconstraint_wfg2_10_5', 
-# 'subset_Pymoo_ManyO_unconstraint_wfg3_10_5', 
-# 'subset_Pymoo_MO_unconstraint_kursawe', 
-# 'subset_Pymoo_MO_unconstraint_zdt1', 
-# 'subset_Pymoo_MO_unconstraint_zdt2', 
-# 'subset_Pymoo_MO_unconstraint_zdt6']
+task = ['kursawe', 'omnitest', 'sympart_rotated', 'sympart', 'zdt1', 'zdt2', 'zdt3', 'zdt4', 'zdt6']
+# task = ['convex_dtlz2', 'convex_dtlz4', 'dtlz1_inv', 'dtlz1', 'dtlz2', 'dtlz3', 'dtlz4', 'dtlz5', 'dtlz6', 'dtlz7', 'sdtlz1', 'wfg1_10_5','wfg2_10_5', 'wfg3_10_5', 'wfg4_10_5', 'wfg5_10_5', 'wfg6_10_5', 'wfg7_10_5', 'wfg8_10_5', 'wfg9_10_5']
 
 
 
@@ -48,7 +31,7 @@ combinations = list(product(
     adjust_cs,
     adjust_previous_cfgs,
     cs_proba_hpi,
-    set_to,
+    rnd_aug_pc,
     thresh,
     gt_hpi,
     task,
@@ -56,7 +39,7 @@ combinations = list(product(
 
 columns = [
     'hpi_method', 'adjust_cs', 'adjust_previous_cfgs',
-    'cs_proba_hpi', 'set_to',
+    'cs_proba_hpi', 'rnd_aug_pc',
     'thresh',
     'gt_hpi',
     'task'
@@ -69,9 +52,9 @@ def remove(row, li):
     return row
 
 df[df['adjust_cs']=='no'] = df[df['adjust_cs']=='no'].apply(lambda row: remove(row, ['cs_proba_hpi']), axis=1)
-df[(df['adjust_previous_cfgs']=='no')] = df[(df['adjust_previous_cfgs']=='no')].apply(lambda row: remove(row, ['set_to']), axis=1)
+df[(df['adjust_previous_cfgs']=='no')] = df[(df['adjust_previous_cfgs']=='no')].apply(lambda row: remove(row, ['rnd_aug_pc']), axis=1)
 df = df[~((df['adjust_cs']=='no') & (df['adjust_previous_cfgs']=='no'))]
-# df = df[~((df['cs_proba_hpi']=='true')&(df['hpi_method']=='hypershap'))]
+df = df[~((df['cs_proba_hpi']=='true')&(df['hpi_method']=='hypershap'))]
 
 df = df.drop_duplicates()
 
@@ -82,7 +65,7 @@ for _, row in df.iterrows():
     # Construct the command dynamically, skipping None values
     #command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
     command = "sbatch start_create_cmds.sh "
-    command += f" '+task/subselection/multiobjective/dev={row['task']}'"
+    command += f" '+task/Pymoo/MO/unconstraint={row['task']}'"
 
     baserundir = "results_new_ablation/"
     
@@ -100,9 +83,9 @@ for _, row in df.iterrows():
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.adjust_previous_cfgs={row['adjust_previous_cfgs']}"
     baserundir += f"_adjust_prev_cfgs_{row['adjust_previous_cfgs']}"
     
-    if row['set_to'] is not None:
-        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.set_to={row['set_to']}"
-        baserundir += f"_set_to_{row['set_to']}"
+    if row['rnd_aug_pc'] is not None:
+        command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.rnd_aug_pc={row['rnd_aug_pc']}"
+        baserundir += f"_rnd_aug_pc_{row['rnd_aug_pc']}"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.thresh={row['thresh'][1]}"
     baserundir += f"_thresh_{row['thresh'][0]}"
