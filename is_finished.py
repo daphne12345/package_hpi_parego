@@ -54,12 +54,24 @@ def read_overrides(overrides_path):
         raise ValueError(f"{overrides_path} does not contain a list of overrides.")
     return overrides
 
+def check_seeds(dir_path):
+    """
+
+    """
+    seeds = os.listdir('/'.join(dir_path.split('/')[:-1]))
+    missing = set(range(10)) - set(int(seed) for seed in seeds if seed.isdigit())
+    if missing:
+        print(f"Missing seeds in {dir_path}: {missing}")
+
+
 def main(root_dir):
     all_ok = True
     for dirpath in find_result_dirs(root_dir):
         error = False
         config_path = os.path.join(dirpath, ".hydra/config.yaml")
         trial_logs_path = os.path.join(dirpath, "trial_logs.jsonl")
+        if dirpath.split('/')[-1]=="0":
+            check_seeds(dirpath)
 
         try:
             n_trials_expected = read_n_trials_from_config(config_path)
@@ -73,14 +85,14 @@ def main(root_dir):
         
         if error:
             all_ok = False
-            overrides_path = os.path.join(dirpath, ".hydra/overrides.yaml")
-            overrides = read_overrides(overrides_path)
-            override_str = " ".join(overrides)
+            # overrides_path = os.path.join(dirpath, ".hydra/overrides.yaml")
+            # overrides = read_overrides(overrides_path)
+            # override_str = " ".join(overrides)
             
-            command = f"sbatch start_create_cmds.sh {override_str}"
-            process = subprocess.run(command, shell=True)
-            if process.returncode != 0:
-                print(f"Command failed: {command}")
+            # command = f"sbatch start_create_cmds.sh {override_str}"
+            # process = subprocess.run(command, shell=True)
+            # if process.returncode != 0:
+            #     print(f"Command failed: {command}")
 
     if all_ok:
         print("\n✅ All runs are complete.")

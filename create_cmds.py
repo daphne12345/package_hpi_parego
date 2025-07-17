@@ -3,27 +3,40 @@ from itertools import product
 import subprocess
 import time
 
-hpi_method = ['fanova']
-adjust_cs = ['no']
+hpi_method = ['fanova', 'random']
+adjust_cs = ['default']
 cs_proba_hpi = ['false']
 
 adjust_previous_cfgs = ['no'] 
 rnd_aug_pc = ['false']
 gt_hpi = ['false']
+seed = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-
-# thresh = [('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'),  ('0-075-0','[0.0,0.75,0.75,0.75,0.0]'), ('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('down-0','[0.9,0.7,0.5,0.3,0.0]'), ('0-down','[0.0,0.9,0.7,0.5,0.3]'), 
-#           ('0-down-0-fine','[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]'), ('075','0.75'), ('cos','[0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220,0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220]')]
-# thresh = [('0-075','[0.0,0.75]'), ('0-down-half' ,'[0.0,0.0,0.0,0.0,0.8,0.6,0.4,0.0]')]
+# thresh = [('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'), ('0-up','[0.0,0.2,0.4,0.6,0.8]'), ('up-0','[0.2,0.4,0.6,0.8,0.0]'), ('0-up-0-fine','[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.0]'), ('0-up-half' ,'[0.0,0.0,0.0,0.0,0.2,0.4,0.6,,0.8]'),
+#           ('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('down-0','[0.9,0.7,0.5,0.3,0.0]'), ('0-down','[0.0,0.9,0.7,0.5,0.3]'), ('0-down-0-fine','[0.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0]'), ('0-down-half' ,'[0.0,0.0,0.0,0.0,0.8,0.6,0.4,0.2,0.0]'),
+#           ('cos','[0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220,0.9,0.8780,0.8130,0.7135,0.5891,0.4500,0.3109,0.1865,0.0870,0.0220]'),
+#           ('075','0.75'),('0-075-0','[0.0,0.75,0.75,0.75,0.0]'), ('0-075','[0.0,0.75]'), 
+#           ('05','0.5'),('0-05-0','[0.0,0.5,0.5,0.5,0.0]'), ('0-05','[0.0,0.5]'),
+#           ('03','0.3'),('0-03-0','[0.0,0.3,0.3,0.3,0.0]'), ('0-03','[0.0,0.3]')
+        #   ]
 # thresh = [('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]')]
 # thresh = [('0-05','[0.0,0.5]'), ('0-75','[0.0,0.75]'), ('075','0.75'),('0-down-0','[0.0,0.9,0.7,0.5,0.3,0.0]'), ('0-up-0','[0.0,0.2,0.4,0.6,0.8,0.0]'))]
-thresh = [('075','0.75')]
+thresh = [('0-075-0','[0.0,0.75,0.75,0.75,0.0]'), ('0-down','[0.0,0.9,0.7,0.5,0.3]')]
 
+# task = ['time', 'fair_loss']
+# task = ['kursawe', 'omnitest', 'sympart_rotated', 'sympart', 'zdt1', 'zdt2', 'zdt3', 'zdt4', 'zdt6']
+task = ['convex_dtlz2', 'convex_dtlz4', 'dtlz1_inv', 'dtlz1', 'dtlz2', 'dtlz3', 'dtlz4', 'dtlz5', 'dtlz6', 'dtlz7', 'sdtlz1', 'wfg1_10_5','wfg2_10_5', 'wfg3_10_5', 'wfg4_10_5', 'wfg5_10_5', 'wfg6_10_5', 'wfg7_10_5', 'wfg8_10_5', 'wfg9_10_5']
 
-task = ['kursawe', 'omnitest', 'sympart_rotated', 'sympart', 'zdt1', 'zdt2', 'zdt3', 'zdt4', 'zdt6']
-# task = ['convex_dtlz2', 'convex_dtlz4', 'dtlz1_inv', 'dtlz1', 'dtlz2', 'dtlz3', 'dtlz4', 'dtlz5', 'dtlz6', 'dtlz7', 'sdtlz1', 'wfg1_10_5','wfg2_10_5', 'wfg3_10_5', 'wfg4_10_5', 'wfg5_10_5', 'wfg6_10_5', 'wfg7_10_5', 'wfg8_10_5', 'wfg9_10_5']
-
-
+# task = ['subset_hpobench_multiobjective_tabular_ml_lr_53', 'subset_hpobench_multiobjective_tabular_ml_lr_9952', 'subset_hpobench_multiobjective_tabular_ml_lr_9977', 'subset_hpobench_multiobjective_tabular_ml_lr_10101', 
+# 'subset_hpobench_multiobjective_tabular_ml_lr_146212', 'subset_hpobench_multiobjective_tabular_ml_lr_146606', 'subset_hpobench_multiobjective_tabular_ml_lr_146818', 'subset_hpobench_multiobjective_tabular_ml_lr_146821', 
+# 'subset_hpobench_multiobjective_tabular_ml_lr_146822', 'subset_hpobench_multiobjective_tabular_ml_lr_167119', 'subset_hpobench_multiobjective_tabular_ml_lr_167120', 'subset_hpobench_multiobjective_tabular_ml_nn_3917', 
+# 'subset_hpobench_multiobjective_tabular_ml_nn_10101', 'subset_hpobench_multiobjective_tabular_ml_nn_146821', 'subset_hpobench_multiobjective_tabular_ml_rf_3', 'subset_hpobench_multiobjective_tabular_ml_rf_9952', 
+# 'subset_hpobench_multiobjective_tabular_ml_rf_146212', 'subset_hpobench_multiobjective_tabular_ml_rf_167119', 'subset_hpobench_multiobjective_tabular_ml_rf_167120', 'subset_hpobench_multiobjective_tabular_ml_rf_168911',
+# 'subset_hpobench_multiobjective_tabular_ml_svm_3', 'subset_hpobench_multiobjective_tabular_ml_svm_31', 'subset_hpobench_multiobjective_tabular_ml_svm_53', 'subset_hpobench_multiobjective_tabular_ml_svm_3917', 
+# 'subset_hpobench_multiobjective_tabular_ml_svm_9952', 'subset_hpobench_multiobjective_tabular_ml_svm_9977', 'subset_hpobench_multiobjective_tabular_ml_svm_14965', 'subset_hpobench_multiobjective_tabular_ml_svm_146822',
+# 'subset_hpobench_multiobjective_tabular_ml_svm_168911', 'subset_hpobench_multiobjective_tabular_ml_xgboost_3917', 'subset_hpobench_multiobjective_tabular_ml_xgboost_7592', 'subset_hpobench_multiobjective_tabular_ml_xgboost_9952',
+# 'subset_hpobench_multiobjective_tabular_ml_xgboost_146606', 'subset_hpobench_multiobjective_tabular_ml_xgboost_146822', 'subset_hpobench_multiobjective_tabular_ml_xgboost_167120', 'subset_yahpo_mo_iaml_glmnet_1489_None', 'subset_yahpo_mo_iaml_ranger_1489_None',
+# 'subset_yahpo_mo_rbv2_ranger_375_None', 'subset_yahpo_mo_rbv2_xgboost_28_None', 'subset_yahpo_mo_rbv2_xgboost_182_None']
 
 # Generate all combinations
 combinations = list(product(
@@ -35,6 +48,7 @@ combinations = list(product(
     thresh,
     gt_hpi,
     task,
+    seed
 ))
 
 columns = [
@@ -42,7 +56,8 @@ columns = [
     'cs_proba_hpi', 'rnd_aug_pc',
     'thresh',
     'gt_hpi',
-    'task'
+    'task',
+    'seed'
 ]
 df = pd.DataFrame(combinations, columns=columns)
 
@@ -65,9 +80,9 @@ for _, row in df.iterrows():
     # Construct the command dynamically, skipping None values
     #command = "python -m carps.experimenter.create_cluster_configs hydra.searchpath=[file:////scratch/hpc-prf-intexml/daphne/hpi_parego/package_hpi_parego/hpi_parego/configs] +optimizer/smac20=multiobjective_rf +customoptimizer=hpi_parego  'seed=range(0,5)'"
     command = "sbatch start_create_cmds.sh "
-    command += f" '+task/Pymoo/MO/unconstraint={row['task']}'"
+    command += f" '+task/Pymoo/ManyO/unconstraint={row['task']}' seed={row['seed']}"
 
-    baserundir = "results_new_ablation/"
+    baserundir = "results_rnd_vs_hpi/"
     
     command += f" optimizer.smac_cfg.smac_kwargs.acquisition_maximizer.hpi_method={row['hpi_method']}"
     baserundir += f"{row['hpi_method']}/"
@@ -106,7 +121,7 @@ for command in commands:
    
     if process.returncode != 0:
         print(f"Command failed: {command}")
-    time.sleep(1)
+    time.sleep(0.1)
 print('command length', len(commands))
 print('all commands executed')
 exit()

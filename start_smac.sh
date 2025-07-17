@@ -36,7 +36,7 @@ done
 
 # Construct the Hydra command
 echo $CWD
-HYDRA_CMD="python -m carps.run "
+HYDRA_CMD="python -m carps.run " #'seed=range(0,10)' "
 
 # Add all Hydra overrides
 for override in "${HYDRA_OVERRIDES[@]}"; do

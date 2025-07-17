@@ -229,10 +229,9 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
             Y = self._acquisition_function.model.predict_marginalized(X)[0]
             return self._cal_fanova(X, Y)
         
-        df_rnd = pd.read_parquet('random_search/logs.parquet')
-        task = f"multi-objective/50/dev/{'/'.join(str(self.path_to_run).split('/')[8:-3])}"
-        print('task', task)
-        df_rnd = df_rnd[(df_rnd['task_id']==task) & (df_rnd['seed']==self._seed)]
+        df_rnd = pd.read_parquet('randomsearch/logs.parquet')
+        task = f"{'/'.join(str(self.path_to_run).split('/')[8:-3])}"
+        df_rnd = df_rnd[df_rnd['task_id'].str.contains(task) & (df_rnd['seed']==self._seed)]
         print('shape of df_rnd', df_rnd.shape)
         rnd_cfgs = df_rnd['trial_info__config'].apply(self.to_cfg).to_list()
         X = convert_configurations_to_array(rnd_cfgs)
@@ -245,7 +244,7 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         hps_guess, _ = self._cal_fanova(X, Y)
         self.hps_guess.append(hps_guess)
         pckl.dump(self.hps_guess, open(self.path_to_run / 'hps_guess.pckl', 'wb'))
-        self.fscores = f1_score(hps_gt, hps_guess)
+        self.fscores = f1_score(hps_gt, hps_guess, average='micro')
         pckl.dump(self.fscores, open(self.path_to_run / 'fscores_hps.pckl', 'wb'))
         return hps_gt, hpis
             
