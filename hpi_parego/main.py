@@ -110,8 +110,8 @@ if __name__ == "__main__":
 
     my_acquisition_function = MyEI()
     my_config_selector = MyConfigSelector(scenario)
-    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, hpi_method='fanova',
-        adjust_previous_cfgs='no', rnd_aug_pc=True, adjust_cs='random', cs_proba_hpi=True, gt_hpi=False, multi_objective_algorithm=multi_objective_algorithm, thresh=[0.75])
+    my_maximizer = MyLocalAndSortedRandomSearchConfigSpace(mlp.configspace, my_acquisition_function, path_to_run=scenario.output_directory, hpi_method='hypershap',
+        adjust_previous_cfgs='no', rnd_aug_pc=True, adjust_cs='random', cs_proba_hpi=False, gt_hpi=False, thresh=[0.75])
     
 
     # Create our SMAC object and pass the scenario and the train method

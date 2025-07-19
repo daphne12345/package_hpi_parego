@@ -303,32 +303,25 @@ class MyLocalAndSortedRandomSearchConfigSpace(AbstractAcquisitionMaximizer):
         Returns:
             _type_: list of important hps
         """
-            
-        hpo_game = HPIGame(self._configspace, previous_configs, model=self._acquisition_function.model)
+        rnd_cfgs = self._configspace.sample_configuration(10000)
+        hpo_game = HPIGame(self._configspace, rnd_cfgs, model=self._acquisition_function.model)
         print('n hps:', hpo_game.n_players)
         if hpo_game.n_players <= 10:
             computer = shapiq.ExactComputer(n_players=hpo_game.n_players, game=hpo_game)
-            # mi_values = computer(index="Moebius", order=hpo_game.n_players)  # compute Moebius values
-            mi_values = computer.shapley_interaction(index="FSII", order=2)                     
+            sv = computer(index="SV", order=1)                    
         elif hpo_game.n_players <= 25:
-            # approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=2, index="k-SII")
-            # mi_values = approximator.approximate(budget=10*hpo_game.n_players, game=hpo_game)
-            approximator = shapiq.PermutationSamplingSII(n=hpo_game.n_players, max_order=2)
-            mi_values = approximator.approximate(budget=10 * hpo_game.n_players, game=hpo_game)
+            approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=1, index="SV")
+            sv = approximator.approximate(budget=2^10, game=hpo_game)
         else:
-            approximator = shapiq.PermutationSamplingSII(n=hpo_game.n_players, max_order=2)
-            mi_values = approximator.approximate(budget=hpo_game.n_players, game=hpo_game)
-            
-        mi_values = dict(zip(mi_values.interaction_lookup, mi_values.values))
-        coas = self.sum_mi_values_higher(mi_values)
-        thresh = np.quantile(list(coas.values()), self.thresh) 
+            approximator = shapiq.KernelSHAPIQ(n=hpo_game.n_players, max_order=1, index="SV")
+            sv = approximator.approximate(budget=2^8, game=hpo_game)   
+        thresh = np.quantile(sv.values, self.thresh) 
         thresh = max(thresh, 0)
         if thresh>0:
-            coas = [(co, len(co[0])) for co in (coas.items()) if co[1]>thresh]
-        if len(coas)==0:
-            return []
-        min_coa = list(min(coas, key=lambda x: x[1])[0][0])
-        important_hps = [self._configspace.get_hyperparameter_names()[i] for i in min_coa]
+            sv_values = [val for val in sv][1:]
+            sv_values = [i for (i,val) in enumerate(sv_values) if val>thresh]
+        player_name_lookup = {y: x for x, y in hpo_game.player_name_lookup.items()}
+        important_hps = [player_name_lookup[i] for i in sv_values]
         del hpo_game
         return important_hps
        

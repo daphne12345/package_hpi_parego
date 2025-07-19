@@ -14,7 +14,7 @@ class HPIGame(Game, ABC):
         cs,
         cfgs,
         model,
-        aggregator=lambda x: np.mean(np.array(x)),
+        aggregator=lambda x: np.max(np.array(x*(-1.0))),
         random_state=0,
         verbose = False,
     ) -> None:
